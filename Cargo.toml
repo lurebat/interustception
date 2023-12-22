@@ -1,0 +1,26 @@
+[package]
+name = "interustception"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+wdk = "0.1.0"
+wdk-alloc = "0.1.0"
+wdk-panic = "0.1.0"
+wdk-sys = "0.1.0"
+
+[build-dependencies]
+wdk-build = "0.1.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.dev]
+panic = "abort"
+lto = true # optional setting to enable Link Time Optimizations
+
+[profile.release]
+panic = "abort"
+lto = true # optional setting to enable Link Time Optimizations
