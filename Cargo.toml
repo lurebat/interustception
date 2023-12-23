@@ -14,10 +14,6 @@ paste = "1.0.14"
 bytemuck = "1.14.0"
 num_enum = "0.7.1"
 
-[dependencies.windows-sys]
-version = "0.52.0"
-features = ["Win32_UI_Input_KeyboardAndMouse", "Win32_Devices", "Win32_Devices_HumanInterfaceDevice"]
-
 
 [build-dependencies]
 wdk-build = "0.1.0"

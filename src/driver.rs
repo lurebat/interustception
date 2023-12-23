@@ -88,7 +88,7 @@ extern "C" fn device_add(_driver: WDFDRIVER, device_init: PWDFDEVICE_INIT) -> NT
                 .as_mut()
                 .expect("WDF should never provide a null pointer for device_init")
         };
-    device::echo_device_create(device_init)
+    unsafe { device::echo_device_create(device_init) }
 }
 
 /// This routine shows how to retrieve framework version string and

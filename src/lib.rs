@@ -43,16 +43,16 @@ mod driver;
 #[cfg(not(test))]
 extern crate wdk_panic;
 
-use wdk::wdf;
+use core::ptr::null_mut;
 #[cfg(not(test))]
 use wdk_alloc::WDKAllocator;
-use wdk_sys::{*};
-mod wdf_object_context;
-use core::sync::atomic::AtomicI32;
-use windows_sys::Win32::Devices::HumanInterfaceDevice::KEYBOARD_ATTRIBUTES;
-use windows_sys::Win32::Networking::WinSock::LPSERVICE_CALLBACK_PROC;
+use wdk_sys::{*, ntddk::KeGetCurrentIrql};
 
-use wdf_object_context::{wdf_declare_context_type, wdf_declare_context_type_with_name};
+mod wdf_object_context;
+mod foreign;
+
+use wdf_object_context::{wdf_declare_context_type};
+use crate::foreign::{ConnectData, KeyboardAttributes};
 
 #[cfg(not(test))]
 #[global_allocator]
@@ -68,27 +68,21 @@ const GUID_DEVINTERFACE_ECHO: GUID = GUID {
     ],
 };
 
-#[repr(C)]
-#[derive(Default, Copy, Clone)]
-struct ConnectData {
-    class_device_object: PDEVICE_OBJECT,
-    class_service: PVOID,
+
+
+impl Default for ConnectData {
+    fn default() -> Self {
+        Self {
+            class_device_object: null_mut(),
+            class_service: null_mut(),
+        }
+    }
 }
 
 pub struct DeviceContext {
-    device: WDFDEVICE,
     raw_pdo_queue: WDFQUEUE,
-    enable_count: i64,
     upper_connect_data: ConnectData,
     
-    upper_context: PVOID,
-    call_context: PVOID,
-    
-    keyboard_attributes: KEYBOARD_ATTRIBUTES,
-    
-    upper_initialization_routine: PVOID,
-    upper_isr_hook: PVOID,
-    isr_write_port: PVOID,
-    queue_keyboard_packet: PVOID,
+    keyboard_attributes: KeyboardAttributes,
 }
 wdf_declare_context_type!(DeviceContext);
