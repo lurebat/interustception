@@ -39,7 +39,6 @@
 
 mod device;
 mod driver;
-mod queue;
 
 #[cfg(not(test))]
 extern crate wdk_panic;
@@ -47,9 +46,11 @@ extern crate wdk_panic;
 use wdk::wdf;
 #[cfg(not(test))]
 use wdk_alloc::WDKAllocator;
-use wdk_sys::{ntddk::KeGetCurrentIrql, *};
+use wdk_sys::{*};
 mod wdf_object_context;
 use core::sync::atomic::AtomicI32;
+use windows_sys::Win32::Devices::HumanInterfaceDevice::KEYBOARD_ATTRIBUTES;
+use windows_sys::Win32::Networking::WinSock::LPSERVICE_CALLBACK_PROC;
 
 use wdf_object_context::{wdf_declare_context_type, wdf_declare_context_type_with_name};
 
@@ -67,28 +68,27 @@ const GUID_DEVINTERFACE_ECHO: GUID = GUID {
     ],
 };
 
-// Declare queue context.
-//
-// ====== CONTEXT SETUP ========//
+#[repr(C)]
+#[derive(Default, Copy, Clone)]
+struct ConnectData {
+    class_device_object: PDEVICE_OBJECT,
+    class_service: PVOID,
+}
 
-// The device context performs the same job as
-// a WDM device extension in the driver frameworks
 pub struct DeviceContext {
-    queue: WDFQUEUE, // just a placeholder
+    device: WDFDEVICE,
+    raw_pdo_queue: WDFQUEUE,
+    enable_count: i64,
+    upper_connect_data: ConnectData,
+    
+    upper_context: PVOID,
+    call_context: PVOID,
+    
+    keyboard_attributes: KEYBOARD_ATTRIBUTES,
+    
+    upper_initialization_routine: PVOID,
+    upper_isr_hook: PVOID,
+    isr_write_port: PVOID,
+    queue_keyboard_packet: PVOID,
 }
 wdf_declare_context_type!(DeviceContext);
-
-pub struct QueueContext {
-    buffer: PVOID,
-    length: usize,
-    timer: wdf::Timer,
-    current_request: WDFREQUEST,
-    current_status: NTSTATUS,
-    spin_lock: wdf::SpinLock,
-}
-wdf_declare_context_type_with_name!(QueueContext, queue_get_context);
-
-pub struct RequestContext {
-    cancel_completion_ownership_count: AtomicI32,
-}
-wdf_declare_context_type_with_name!(RequestContext, request_get_context);
