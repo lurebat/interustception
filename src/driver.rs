@@ -35,6 +35,11 @@ extern "system" fn driver_entry(
     driver: &mut DRIVER_OBJECT,
     registry_path: PCUNICODE_STRING,
 ) -> NTSTATUS {
+
+    println!("rust - Enter DriverEntry");
+    return STATUS_SUCCESS;
+
+
     let mut driver_config = WDF_DRIVER_CONFIG {
         Size: core::mem::size_of::<WDF_DRIVER_CONFIG>() as ULONG,
         EvtDriverDeviceAdd: Some(device_add),
@@ -57,9 +62,7 @@ extern "system" fn driver_entry(
         println!("Error: WdfDriverCreate failed {nt_status:#010X}");
         return nt_status;
     }
-
-    echo_print_driver_version();
-
+    
     nt_status
 }
 

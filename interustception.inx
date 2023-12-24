@@ -2,7 +2,7 @@
 ; Copyright (c)2023, Microsoft Corporation
 ;
 ;Module Name:
-;    INTERUSTCEPTION.INF
+;    ECHO_2.INF
 ;===================================================================
 
 [Version]
@@ -36,6 +36,7 @@ HKR,,Icon,,-5
 %StdMfg%=Standard,NT$ARCH$.10.0...16299
 
 [Standard.NT$ARCH$.10.0...16299]
+%ECHO.DeviceDesc%=ECHO_Device, root\ECHO_3
 
 [ECHO_Device.NT$ARCH$]
 CopyFiles=Drivers_Dir
@@ -45,13 +46,21 @@ interustception.sys
 
 ; ================= Service installation =================
 [ECHO_Device.NT$ARCH$.Services]
+AddService = ECHO_3, %SPSVCINST_ASSOCSERVICE%, ECHO_Service_Inst
+
+[ECHO_Service_Inst]
+DisplayName    = %ECHO.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %13%\interustception.sys
 
 ; ================= Strings =================
 [Strings]
 SPSVCINST_ASSOCSERVICE = 0x00000002
 ProviderString         = "TODO-Set-Provider"
 StdMfg                 = "(Standard system devices)"
-DiskId1                = "WDF Sample ECHO Installation Disk #1 (DriverSync)"
-ECHO.DeviceDesc        = "Sample WDF ECHO Driver (DriverSync)"
-ECHO.SVCDESC           = "Sample WDF ECHO Service (DriverSync)"
-ClassName              = "Sample Device"
+DiskId1                = "WDF3  Sample ECHO Installation Disk #1 (DriverSync)"
+ECHO.DeviceDesc        = "Sample3 WDF ECHO Driver (DriverSync)"
+ECHO.SVCDESC           = "Sample3 WDF ECHO Service (DriverSync)"
+ClassName              = "Sample3 Device"

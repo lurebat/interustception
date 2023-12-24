@@ -30,8 +30,8 @@
 
 #![no_std]
 #![cfg_attr(feature = "nightly", feature(hint_must_use))]
-#![deny(warnings)]
-#![deny(clippy::all)]
+//#![deny(warnings)]
+//#![deny(clippy::all)]
 #![warn(clippy::pedantic)]
 #![warn(clippy::nursery)]
 #![warn(clippy::cargo)]
@@ -42,6 +42,7 @@ mod driver;
 
 #[cfg(not(test))]
 extern crate wdk_panic;
+extern crate alloc;
 
 use core::ptr::null_mut;
 #[cfg(not(test))]
@@ -53,6 +54,7 @@ mod foreign;
 
 use wdf_object_context::{wdf_declare_context_type};
 use crate::foreign::{ConnectData, KeyboardAttributes};
+use crate::wdf_object_context::wdf_declare_context_type_with_name;
 
 #[cfg(not(test))]
 #[global_allocator]
@@ -86,3 +88,10 @@ pub struct DeviceContext {
     keyboard_attributes: KeyboardAttributes,
 }
 wdf_declare_context_type!(DeviceContext);
+
+pub struct PdoContext {
+    instance: u32,
+    queue: WDFQUEUE
+}
+
+wdf_declare_context_type_with_name!(PdoContext, get_pdo_context);
