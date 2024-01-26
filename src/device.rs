@@ -36,14 +36,14 @@ static mut INSTANCES: AtomicU32 = AtomicU32::new(0);
 #[link_section = "PAGE"]
 pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) -> NTSTATUS {
     paged_code!();
-    
+
     println!("echo_device_create called");
 
     call_unsafe_wdf_function_binding!(
         WdfFdoInitSetFilter,
         device_init
     );
-    
+
     println!("WdfFdoInitSetFilter called");
 
     call_unsafe_wdf_function_binding!(
@@ -51,7 +51,7 @@ pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) ->
         device_init,
         FILE_DEVICE_KEYBOARD
     );
-    
+
     println!("WdfDeviceInitSetDeviceType called");
 
     let mut attributes = WDF_OBJECT_ATTRIBUTES {
@@ -62,9 +62,9 @@ pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) ->
     };
 
     attributes.ContextTypeInfo = wdf_get_context_type_info!(DeviceContext);
-    
+
     println!("WdfDeviceInitSetDeviceType called");
-    
+
     let mut device = WDF_NO_HANDLE as WDFDEVICE;
     let nt_status = unsafe {
         call_unsafe_wdf_function_binding!(
@@ -74,7 +74,7 @@ pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) ->
             &mut device,
         )
     };
-    
+
     println!("WdfDeviceCreate called");
 
     if !nt_success(nt_status) {
@@ -87,7 +87,7 @@ pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) ->
     // if this driver is going to be filtering PS2 ports because it can lead to
     // deadlock. The PS2 port driver sends a request to the top of the stack when it
     // receives an ioctl request and waits for it to be completed. If you use a
-    // a sequential queue, this request will be stuck in the queue because of the 
+    // a sequential queue, this request will be stuck in the queue because of the
     // outstanding ioctl request sent earlier to the port driver.
     //
     let mut queue_config = WDF_IO_QUEUE_CONFIG {
@@ -98,7 +98,7 @@ pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) ->
         EvtIoInternalDeviceControl: Some(internal_ioctl),
         ..WDF_IO_QUEUE_CONFIG::default()
     };
-    
+
     println!("WDF_IO_QUEUE_CONFIG initialized");
 
     // Create queue.
@@ -111,14 +111,14 @@ pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) ->
             WDF_NO_HANDLE as *mut WDFQUEUE,
         )
     };
-    
+
     println!("WdfIoQueueCreate called");
 
     if !nt_success(nt_status) {
         println!("WdfIoQueueCreate failed {nt_status:#010X}");
         return nt_status;
     }
-    
+
     println!("WdfIoQueueCreate succeeded");
 
     let mut pdo_queue_config = WDF_IO_QUEUE_CONFIG {
@@ -129,13 +129,13 @@ pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) ->
         EvtIoInternalDeviceControl: Some(pdo_from_ioctl),
         ..WDF_IO_QUEUE_CONFIG::default()
     };
-    
+
     println!("WDF_IO_QUEUE_CONFIG initialized");
 
     let mut pdo_queue = null_mut() as WDFQUEUE;
 
     println!("WdfIoQueueCreate called");
-    
+
     nt_status = unsafe {
         call_unsafe_wdf_function_binding!(
             WdfIoQueueCreate,
@@ -145,16 +145,16 @@ pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) ->
             &mut pdo_queue,
         )
     };
-    
+
     println!("WdfIoQueueCreate called");
 
     if !nt_success(nt_status) {
         println!("WdfIoQueueCreate for pdo failed {nt_status:#010X}");
         return nt_status;
     }
-    
+
     println!("WdfIoQueueCreate for pdo succeeded");
-    
+
     let device_context: *mut DeviceContext =
         unsafe { wdf_object_get_device_context(device as WDFOBJECT) };
     unsafe { (*device_context).raw_pdo_queue = pdo_queue };
@@ -206,7 +206,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
     DECLARE_CONST_UNICODE_STRING(deviceLocation,L"Keyboard Filter\0" );
     DECLARE_UNICODE_STRING_SIZE(buffer, MAX_ID_LEN);
      */
-    
+
     println!("create_pdo called");
 
     let mut device_init = unsafe {
@@ -234,7 +234,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
      */
 
     // 4D36E96B-E325-11CE-BFC1-08002BE10318
-    
+
     println!("WdfPdoInitAssignRawDevice called");
 
 
@@ -245,12 +245,12 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
             &GUID_CLASS_KEYBOARD,
         )
     };
-    
+
     if !nt_success(status) {
         println!("WdfPdoInitAssignRawDevice failed {status:#010X}");
         return status;
     }
-    
+
     /*
         //
     // Assign DeviceID - This will be reported to IRP_MN_QUERY_ID/BusQueryDeviceID
@@ -260,44 +260,44 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
         goto Cleanup;
     }
      */
-    
+
     println!("WdfPdoInitAssignRawDevice called");
-    
+
     status = unsafe {
         call_unsafe_wdf_function_binding!(
             WdfPdoInitAssignDeviceID,
             device_init,
             &DEVICE_ID,
         ) };
-    
+
     if !nt_success(status) {
         println!("WdfPdoInitAssignDeviceID failed {status:#010X}");
         return status;
     }
-    
+
     let mut buffer_bytes = [0u16; 128];
     let mut buffer = UNICODE_STRING {
         Length: 0,
         MaximumLength: 128,
         Buffer: buffer_bytes.as_mut_ptr(),
     };
-    
+
     println!("WdfPdoInitAssignDeviceID called");
-    
+
     /*
         //
     // We could be enumerating more than one children if the filter attaches
     // to multiple instances of keyboard, so we must provide a
     // BusQueryInstanceID. If we don't, system will throw CA bugcheck.
     */
-    
+
     // buffer_bytes - put in the instance number
     let current_first_digit = current / 10;
     let current_second_digit = current % 10;
     buffer_bytes[0] = '0' as u16 + current_first_digit as u16;
     buffer_bytes[1] = '0' as u16 + current_second_digit as u16;
     buffer.Length = 2u16 * core::mem::size_of::<u16>() as u16;
-    
+
     status = unsafe {
         call_unsafe_wdf_function_binding!(
             WdfPdoInitAssignInstanceID,
@@ -305,12 +305,12 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
             &buffer,
         )
     };
-    
+
     if !nt_success(status) {
         println!("WdfPdoInitAssignInstanceID failed {status:#010X}");
         return status;
     }
-    
+
     /*
      //
     // Provide a description about the device. This text is usually read from
@@ -340,14 +340,14 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
     buffer_bytes[11] = 'l' as u16;
     buffer_bytes[12] = 't' as u16;
     buffer_bytes[13] = 'e' as u16;
-        
+
     buffer_bytes[14] = 'r' as u16;
     buffer_bytes[15] = '_' as u16;
     buffer_bytes[16] = '0' as u16 + current_first_digit as u16;
     buffer_bytes[17] = '0' as u16 + current_second_digit as u16;
     buffer_bytes[18] = 0;
     buffer.Length = 18u16 * core::mem::size_of::<u16>() as u16;
-    
+
     /*
         //
     // You can call WdfPdoInitAddDeviceText multiple times, adding device
@@ -368,9 +368,9 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
 
     WdfPdoInitSetDefaultLocale(pDeviceInit, 0x409);
      */
-    
+
     println!("add text");
-    
+
     status = unsafe { call_unsafe_wdf_function_binding!(
         WdfPdoInitAddDeviceText,
         device_init,
@@ -378,20 +378,20 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
         &DEVICE_ID,
         0x409,
     ) };
-    
+
     if !nt_success(status) {
         println!("WdfPdoInitAddDeviceText failed {status:#010X}");
         return status;
     }
-    
+
     println!("set default locale");
-    
+
     unsafe { call_unsafe_wdf_function_binding!(
         WdfPdoInitSetDefaultLocale,
         device_init,
         0x409,
     ) };
-    
+
 
 
     let mut attributes = WDF_OBJECT_ATTRIBUTES {
@@ -400,23 +400,23 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
         SynchronizationScope: _WDF_SYNCHRONIZATION_SCOPE::WdfSynchronizationScopeInheritFromParent,
         ..WDF_OBJECT_ATTRIBUTES::default()
     };
-    
-    
+
+
     attributes.ContextTypeInfo = wdf_get_context_type_info!(PdoContext);
-    
+
     /*
         //
     // Set up our queue to allow forwarding of requests to the parent
     // This is done so that the cached Keyboard Attributes can be retrieved
     //
     WdfPdoInitAllowForwardingRequestToParent(pDeviceInit);
-    
+
         status = WdfDeviceCreate(&pDeviceInit, &pdoAttributes, &hChild);
     if (!NT_SUCCESS(status)) {
         goto Cleanup;
     }
      */
-    
+
     println!("WdfPdoInitAllowForwardingRequestToParent");
 
     unsafe {
@@ -424,9 +424,9 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
         WdfPdoInitAllowForwardingRequestToParent,
         device_init,    )
     };
-    
+
     println!("WdfDeviceCreate");
-    
+
     let mut pdo = WDF_NO_HANDLE as WDFDEVICE;
     status = unsafe {
         call_unsafe_wdf_function_binding!(
@@ -436,22 +436,22 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
             &mut pdo,
         )
     };
-    
+
     println!("WdfDeviceCreate called");
-    
+
     if !nt_success(status) {
         println!("WdfDeviceCreate failed {status:#010X}");
         return status;
     }
-    
+
     let pdo_context = unsafe { get_pdo_context(pdo as WDFOBJECT) };
     unsafe { (*pdo_context).instance = current };
-    
+
     let device_context = unsafe { wdf_object_get_device_context(device as WDFOBJECT) };
     unsafe { (*pdo_context).queue = (*device_context).raw_pdo_queue };
-    
+
     println!("WdfDeviceCreate succeeded");
-    
+
     /*
      //
     // Configure the default queue associated with the control device object
@@ -476,7 +476,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
     }
 
      */
-    
+
     println!("WdfDeviceCreate succeeded");
 
     let mut queue_config = WDF_IO_QUEUE_CONFIG {
@@ -487,11 +487,11 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
         EvtIoInternalDeviceControl: Some(pdo_to_ioctl),
         ..WDF_IO_QUEUE_CONFIG::default()
     };
-    
+
     println!("WDF_IO_QUEUE_CONFIG initialized");
-    
+
     let mut queue : WDFQUEUE = null_mut() as WDFQUEUE;
-    
+
     status = unsafe {
         call_unsafe_wdf_function_binding!(
             WdfIoQueueCreate,
@@ -501,14 +501,14 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
             &mut queue,
         )
     };
-    
+
     println!("WdfIoQueueCreate called");
-    
+
     if !nt_success(status) {
         println!("WdfIoQueueCreate failed {status:#010X}");
         return status;
     }
-    
+
     let mut caps = WDF_DEVICE_PNP_CAPABILITIES {
         Size: core::mem::size_of::<WDF_DEVICE_PNP_CAPABILITIES>() as ULONG,
         LockSupported: WdfUseDefault,
@@ -523,7 +523,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
         Address: current,
         UINumber: current,
     };
-    
+
     unsafe {
         call_unsafe_wdf_function_binding!(
             WdfDeviceSetPnpCapabilities,
@@ -531,9 +531,9 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
             &mut caps,
         )
     };
-    
+
     println!("WdfDeviceSetPnpCapabilities called");
-    
+
     /*
      //
     // Tell the Framework that this device will need an interface so that
@@ -550,7 +550,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
         goto Cleanup;
     }
      */
-    
+
     status = unsafe {
         call_unsafe_wdf_function_binding!(
             WdfDeviceCreateDeviceInterface,
@@ -559,16 +559,16 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
             core::ptr::null_mut(),
         )
     };
-    
+
     println!("WdfDeviceCreateDeviceInterface called");
-    
+
     if !nt_success(status) {
         println!("WdfDeviceCreateDeviceInterface failed {status:#010X}");
         return status;
     }
-    
+
     status
-    
+
     // todo - cleanup
 }
 
@@ -591,7 +591,7 @@ enum KeyboardIoctl {
     KeyboardConnect = ctl_code(FILE_DEVICE_KEYBOARD, 0x80, METHOD_NEITHER, FILE_ANY_ACCESS),
     KeyboardDisconnect = ctl_code(FILE_DEVICE_KEYBOARD, 0x100, METHOD_NEITHER, FILE_ANY_ACCESS),
     KeyboardQueryAttributes = 720896u32,
-    
+
     PdoKeyboardAttributes = ctl_code(FILE_DEVICE_KEYBOARD, 0x800, METHOD_BUFFERED, FILE_READ_DATA),
 }
 
@@ -818,7 +818,7 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
 extern "C" fn pdo_from_ioctl(queue: WDFQUEUE, request: WDFREQUEST, output_buffer_length: usize, _input_buffer_length: usize, io_control_code: ULONG) {
     paged_code!();
     println!("pdo_from_ioctl called");
-    
+
     let mut status = STATUS_NOT_IMPLEMENTED;
     let mut bytes_transferred: ULONG_PTR = 0;
     if io_control_code == PdoKeyboardAttributes as u32 {
@@ -875,7 +875,7 @@ extern "C" fn pdo_from_ioctl(queue: WDFQUEUE, request: WDFREQUEST, output_buffer
 extern "C" fn pdo_to_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _output_buffer_length: usize, _input_buffer_length: usize, io_control_code: ULONG) {
     paged_code!();
     println!("pdo_to_ioctl called");
-    
+
     if io_control_code == PdoKeyboardAttributes as u32 {
         let forward_options = WDF_REQUEST_SEND_OPTIONS {
             Size: core::mem::size_of::<WDF_REQUEST_SEND_OPTIONS>() as ULONG,
@@ -888,22 +888,22 @@ extern "C" fn pdo_to_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _output_buffer_
             WdfRequestComplete(Request, status);
         }
          */
-        
+
         let parent = unsafe {
             call_unsafe_wdf_function_binding!(
                 WdfIoQueueGetDevice,
                 queue
             )
         };
-        
+
         let pdo_context = unsafe { get_pdo_context(parent as WDFOBJECT) };
-        
+
         /*        status = WdfRequestForwardToParentDeviceIoQueue(Request, pdoData->ParentQueue, &forwardOptions);
         if (!NT_SUCCESS(status)) {
             WdfRequestComplete(Request, status);
         }
          */
-        
+
         let status = unsafe {
             call_unsafe_wdf_function_binding!(
                 WdfRequestForwardToParentDeviceIoQueue,
@@ -911,7 +911,7 @@ extern "C" fn pdo_to_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _output_buffer_
                 (*pdo_context).queue,
                 &forward_options as *const _ as *mut _,
             )};
-        
+
         if !nt_success(status) {
             println!("WdfRequestForwardToParentDeviceIoQueue failed {status:#010X}");
             unsafe {
@@ -974,7 +974,7 @@ unsafe extern "C" fn service_callback(device_object: PDEVICE_OBJECT, input_data_
 #[link_section = "PAGE"]
 unsafe extern "C" fn completion_routine(request: WDFREQUEST, _handle: WDFIOTARGET, params: *mut WDF_REQUEST_COMPLETION_PARAMS, context: WDFCONTEXT) {
     paged_code!();
-    
+
     let params_ioctl = unsafe { &mut (*params).Parameters.Ioctl };
     let params_status = unsafe { (*params).IoStatus.__bindgen_anon_1.Status };
 

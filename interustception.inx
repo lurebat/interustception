@@ -1,66 +1,125 @@
-;===================================================================
-; Copyright (c)2023, Microsoft Corporation
+?;/*++
 ;
-;Module Name:
-;    ECHO_2.INF
-;===================================================================
+; Copyright (c) Microsoft Corporation.  All rights reserved.
+;
+; Module Name:
+;    interustception.inf
+;
+; Abstract:
+;    Installation inf for the Device that needs filtering adapter.
+;
+; Important:
+;    This INF depends on features for the Driver Store DIRIDs which are available starting Windows 10 1809
+;
+;--*/
 
 [Version]
-Signature   = "$WINDOWS NT$"
-Class       = Sample
-ClassGuid   = {78A1C341-4539-11d3-B88D-00C04FAD5171}
-Provider    = %ProviderString%
-PnpLockDown = 1
+Signature="$Windows NT$"
+Provider=%ProviderName%
+ClassGUID={4D36E96B-E325-11CE-BFC1-08002BE10318}
+Class=Keyboard
+DriverVer=07/20/1999, 1.0.0.0
+CatalogFile=KmdfSamples.cat
+PnpLockdown=1
 
 [DestinationDirs]
-DefaultDestDir = 13
+DefaultDestDir   = 13
 
 [SourceDisksNames]
-1 = %DiskId1%,,,""
+1 = %DiskId1%,,,
 
 [SourceDisksFiles]
-interustception.sys  = 1,,
+interustception.sys = 1
 
-; ================= Class section =====================
-
-[ClassInstall32]
-Addreg=SampleClassReg
-
-[SampleClassReg]
-HKR,,,0,%ClassName%
-HKR,,Icon,,-5
-
-; ================= Install section =================
+;
+; Driver information
+;
 
 [Manufacturer]
-%StdMfg%=Standard,NT$ARCH$.10.0...16299
+%MfgName% = Standard,NT$ARCH$
 
-[Standard.NT$ARCH$.10.0...16299]
-%ECHO.DeviceDesc%=ECHO_Device, root\ECHO_3
+[Standard.NT$ARCH$]
+%interustception.DeviceDesc% = interustception, TS_INPT\TS_KBD
 
-[ECHO_Device.NT$ARCH$]
-CopyFiles=Drivers_Dir
+;
+; General installation section
+;
 
-[Drivers_Dir]
+[interustception.NT]
+; perform port related actions from keyboard.inf
+Include=keyboard.inf
+Needs=STANDARD_Inst
+
+; Copy the driver over
+CopyFiles=interustception.CopyFiles
+
+
+;
+; File sections
+;
+
+[interustception.CopyFiles]
 interustception.sys
 
-; ================= Service installation =================
-[ECHO_Device.NT$ARCH$.Services]
-AddService = ECHO_3, %SPSVCINST_ASSOCSERVICE%, ECHO_Service_Inst
 
-[ECHO_Service_Inst]
-DisplayName    = %ECHO.SVCDESC%
-ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
-StartType      = 3               ; SERVICE_DEMAND_START
-ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+;
+; Service Installation
+;
+
+[interustception.NT.Services]
+AddService = interustception,  , interustception_Service_Inst
+; Install the port driver and mouclass from keyboard.inf
+Include=keyboard.inf
+Needs=STANDARD_Inst.Services
+
+[interustception_Service_Inst]
+DisplayName    = %interustception.SvcDesc%
+ServiceType    = 1                  ; SERVICE_KERNEL_DRIVER
+StartType      = 3                  ; SERVICE_DEMAND_START
+ErrorControl   = 0                  ; SERVICE_ERROR_IGNORE
 ServiceBinary  = %13%\interustception.sys
 
-; ================= Strings =================
+[interustception.NT.HW]
+; Add the device upper filter
+AddReg = interustception.HW.AddReg
+
+; run the directives need by the port driver
+Include=keyboard.inf
+Needs=STANDARD_Inst.HW
+
+[interustception.HW.AddReg]
+HKR,,"UpperFilters",0x00010000,"interustception"
+
+
+[interustception.NT.Wdf]
+KmdfService = interustception, interustception_wdfsect
+
+[interustception_wdfsect]
+KmdfLibraryVersion = $KMDFVERSION$
+
+
 [Strings]
-SPSVCINST_ASSOCSERVICE = 0x00000002
-ProviderString         = "TODO-Set-Provider"
-StdMfg                 = "(Standard system devices)"
-DiskId1                = "WDF3  Sample ECHO Installation Disk #1 (DriverSync)"
-ECHO.DeviceDesc        = "Sample3 WDF ECHO Driver (DriverSync)"
-ECHO.SVCDESC           = "Sample3 WDF ECHO Service (DriverSync)"
-ClassName              = "Sample3 Device"
+
+;
+; Non-Localizable Strings
+;
+
+REG_SZ         = 0x00000000
+REG_MULTI_SZ   = 0x00010000
+REG_EXPAND_SZ  = 0x00020000
+REG_BINARY     = 0x00000001
+REG_DWORD      = 0x00010001
+
+;
+; Localizable Strings
+;
+
+ProviderName = "TODO-Set-Provider"
+MfgName      = "TODO-Set-Manufacturer"
+
+interustception.DeviceDesc = "Interustception v2"
+
+; Make sure the service description is unique to avoid collision with another INF.
+interustception.SvcDesc = "Interustception Service v2"
+
+DiskId1 = "Interustception Install Disk"

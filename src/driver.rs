@@ -35,18 +35,17 @@ extern "system" fn driver_entry(
     driver: &mut DRIVER_OBJECT,
     registry_path: PCUNICODE_STRING,
 ) -> NTSTATUS {
-
-    println!("rust - Enter DriverEntry");
-    return STATUS_SUCCESS;
-
+    println!("DriverEntry 1");
 
     let mut driver_config = WDF_DRIVER_CONFIG {
         Size: core::mem::size_of::<WDF_DRIVER_CONFIG>() as ULONG,
         EvtDriverDeviceAdd: Some(device_add),
         ..WDF_DRIVER_CONFIG::default()
     };
+    println!("DriverEntry 2");
     let driver_handle_output = WDF_NO_HANDLE as *mut WDFDRIVER;
 
+    println!("DriverEntry 3");
     let nt_status = unsafe {
         macros::call_unsafe_wdf_function_binding!(
             WdfDriverCreate,
@@ -57,12 +56,16 @@ extern "system" fn driver_entry(
             driver_handle_output,
         )
     };
+    println!("DriverEntry 4");
 
     if !nt_success(nt_status) {
+        println!("DriverEntry 5");
         println!("Error: WdfDriverCreate failed {nt_status:#010X}");
         return nt_status;
     }
-    
+
+    println!("DriverEntry 6");
+
     nt_status
 }
 
