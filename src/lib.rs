@@ -51,6 +51,7 @@ use wdk_sys::{*, ntddk::KeGetCurrentIrql};
 
 mod wdf_object_context;
 mod foreign;
+mod utils;
 
 use wdf_object_context::{wdf_declare_context_type};
 use crate::foreign::{ConnectData, KeyboardAttributes};
@@ -61,7 +62,7 @@ use crate::wdf_object_context::wdf_declare_context_type_with_name;
 static GLOBAL_ALLOCATOR: WDKAllocator = WDKAllocator;
 
 // {CDC35B6E-0BE4-4936-BF5F-5537380A7C1A}
-const GUID_DEVINTERFACE_ECHO: GUID = GUID {
+const GUID_DEVINTERFACE_INTERUSTCEPTION: GUID = GUID {
     Data1: 0xCDC3_5B6Eu32,
     Data2: 0x0BE4u16,
     Data3: 0x4936u16,
@@ -84,7 +85,7 @@ impl Default for ConnectData {
 pub struct DeviceContext {
     raw_pdo_queue: WDFQUEUE,
     upper_connect_data: ConnectData,
-    
+
     keyboard_attributes: KeyboardAttributes,
 }
 wdf_declare_context_type!(DeviceContext);

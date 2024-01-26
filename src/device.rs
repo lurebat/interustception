@@ -13,7 +13,6 @@ use wdk_sys::ntddk::DbgBreakPointWithStatus;
 use crate::{
     wdf_object_context::*,
     DeviceContext,
-    GUID_DEVINTERFACE_ECHO,
     *,
 };
 use crate::device::KeyboardIoctl::PdoKeyboardAttributes;
@@ -37,14 +36,14 @@ static mut INSTANCES: AtomicU32 = AtomicU32::new(0);
 pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) -> NTSTATUS {
     paged_code!();
 
-    println!("echo_device_create called");
+    println!("WAWAWA echo_device_create called");
 
     call_unsafe_wdf_function_binding!(
         WdfFdoInitSetFilter,
         device_init
     );
 
-    println!("WdfFdoInitSetFilter called");
+    println!("WAWAWA WdfFdoInitSetFilter called");
 
     call_unsafe_wdf_function_binding!(
         WdfDeviceInitSetDeviceType,
@@ -52,7 +51,7 @@ pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) ->
         FILE_DEVICE_KEYBOARD
     );
 
-    println!("WdfDeviceInitSetDeviceType called");
+    println!("WAWAWA WdfDeviceInitSetDeviceType called");
 
     let mut attributes = WDF_OBJECT_ATTRIBUTES {
         Size: core::mem::size_of::<WDF_OBJECT_ATTRIBUTES>() as ULONG,
@@ -63,7 +62,7 @@ pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) ->
 
     attributes.ContextTypeInfo = wdf_get_context_type_info!(DeviceContext);
 
-    println!("WdfDeviceInitSetDeviceType called");
+    println!("WAWAWA WdfDeviceInitSetDeviceType called");
 
     let mut device = WDF_NO_HANDLE as WDFDEVICE;
     let nt_status = unsafe {
@@ -75,10 +74,10 @@ pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) ->
         )
     };
 
-    println!("WdfDeviceCreate called");
+    println!("WAWAWA WdfDeviceCreate called");
 
     if !nt_success(nt_status) {
-        println!("Error: WdfDeviceCreate failed {nt_status:#010X}");
+        println!("WAWAWA Error: WdfDeviceCreate failed {nt_status:#010X}");
         return nt_status;
     }
 
@@ -99,7 +98,7 @@ pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) ->
         ..WDF_IO_QUEUE_CONFIG::default()
     };
 
-    println!("WDF_IO_QUEUE_CONFIG initialized");
+    println!("WAWAWA WDF_IO_QUEUE_CONFIG initialized");
 
     // Create queue.
     let mut nt_status = unsafe {
@@ -112,29 +111,29 @@ pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) ->
         )
     };
 
-    println!("WdfIoQueueCreate called");
+    println!("WAWAWA WdfIoQueueCreate called");
 
     if !nt_success(nt_status) {
-        println!("WdfIoQueueCreate failed {nt_status:#010X}");
+        println!("WAWAWA WdfIoQueueCreate failed {nt_status:#010X}");
         return nt_status;
     }
 
-    println!("WdfIoQueueCreate succeeded");
+    println!("WAWAWA WdfIoQueueCreate succeeded");
 
     let mut pdo_queue_config = WDF_IO_QUEUE_CONFIG {
         Size: core::mem::size_of::<WDF_IO_QUEUE_CONFIG>() as ULONG,
         PowerManaged: _WDF_TRI_STATE::WdfUseDefault,
-        DefaultQueue: true as u8,
+        DefaultQueue: false as u8,
         DispatchType: _WDF_IO_QUEUE_DISPATCH_TYPE::WdfIoQueueDispatchParallel,
         EvtIoInternalDeviceControl: Some(pdo_from_ioctl),
         ..WDF_IO_QUEUE_CONFIG::default()
     };
 
-    println!("WDF_IO_QUEUE_CONFIG initialized");
+    println!("WAWAWA WDF_IO_QUEUE_CONFIG initialized");
 
     let mut pdo_queue = null_mut() as WDFQUEUE;
 
-    println!("WdfIoQueueCreate called");
+    println!("WAWAWA WdfIoQueueCreate called");
 
     nt_status = unsafe {
         call_unsafe_wdf_function_binding!(
@@ -146,14 +145,14 @@ pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) ->
         )
     };
 
-    println!("WdfIoQueueCreate called");
+    println!("WAWAWA WdfIoQueueCreate called");
 
     if !nt_success(nt_status) {
-        println!("WdfIoQueueCreate for pdo failed {nt_status:#010X}");
+        println!("WAWAWA WdfIoQueueCreate for pdo failed {nt_status:#010X}");
         return nt_status;
     }
 
-    println!("WdfIoQueueCreate for pdo succeeded");
+    println!("WAWAWA WdfIoQueueCreate for pdo succeeded");
 
     let device_context: *mut DeviceContext =
         unsafe { wdf_object_get_device_context(device as WDFOBJECT) };
@@ -207,7 +206,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
     DECLARE_UNICODE_STRING_SIZE(buffer, MAX_ID_LEN);
      */
 
-    println!("create_pdo called");
+    println!("WAWAWA create_pdo called");
 
     let mut device_init = unsafe {
         call_unsafe_wdf_function_binding!(
@@ -217,7 +216,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
     };
 
     if device_init.is_null() {
-        println!("WdfPdoInitAllocate failed");
+        println!("WAWAWA WdfPdoInitAllocate failed");
         return STATUS_INSUFFICIENT_RESOURCES;
     }
 
@@ -235,7 +234,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
 
     // 4D36E96B-E325-11CE-BFC1-08002BE10318
 
-    println!("WdfPdoInitAssignRawDevice called");
+    println!("WAWAWA WdfPdoInitAssignRawDevice called");
 
 
     let mut status = unsafe {
@@ -247,7 +246,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
     };
 
     if !nt_success(status) {
-        println!("WdfPdoInitAssignRawDevice failed {status:#010X}");
+        println!("WAWAWA WdfPdoInitAssignRawDevice failed {status:#010X}");
         return status;
     }
 
@@ -261,7 +260,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
     }
      */
 
-    println!("WdfPdoInitAssignRawDevice called");
+    println!("WAWAWA WdfPdoInitAssignRawDevice called");
 
     status = unsafe {
         call_unsafe_wdf_function_binding!(
@@ -271,7 +270,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
         ) };
 
     if !nt_success(status) {
-        println!("WdfPdoInitAssignDeviceID failed {status:#010X}");
+        println!("WAWAWA WdfPdoInitAssignDeviceID failed {status:#010X}");
         return status;
     }
 
@@ -282,7 +281,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
         Buffer: buffer_bytes.as_mut_ptr(),
     };
 
-    println!("WdfPdoInitAssignDeviceID called");
+    println!("WAWAWA WdfPdoInitAssignDeviceID called");
 
     /*
         //
@@ -307,7 +306,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
     };
 
     if !nt_success(status) {
-        println!("WdfPdoInitAssignInstanceID failed {status:#010X}");
+        println!("WAWAWA WdfPdoInitAssignInstanceID failed {status:#010X}");
         return status;
     }
 
@@ -369,7 +368,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
     WdfPdoInitSetDefaultLocale(pDeviceInit, 0x409);
      */
 
-    println!("add text");
+    println!("WAWAWA add text");
 
     status = unsafe { call_unsafe_wdf_function_binding!(
         WdfPdoInitAddDeviceText,
@@ -380,11 +379,11 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
     ) };
 
     if !nt_success(status) {
-        println!("WdfPdoInitAddDeviceText failed {status:#010X}");
+        println!("WAWAWA WdfPdoInitAddDeviceText failed {status:#010X}");
         return status;
     }
 
-    println!("set default locale");
+    println!("WAWAWA set default locale");
 
     unsafe { call_unsafe_wdf_function_binding!(
         WdfPdoInitSetDefaultLocale,
@@ -417,7 +416,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
     }
      */
 
-    println!("WdfPdoInitAllowForwardingRequestToParent");
+    println!("WAWAWA WdfPdoInitAllowForwardingRequestToParent");
 
     unsafe {
         call_unsafe_wdf_function_binding!(
@@ -425,7 +424,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
         device_init,    )
     };
 
-    println!("WdfDeviceCreate");
+    println!("WAWAWA WdfDeviceCreate");
 
     let mut pdo = WDF_NO_HANDLE as WDFDEVICE;
     status = unsafe {
@@ -437,10 +436,10 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
         )
     };
 
-    println!("WdfDeviceCreate called");
+    println!("WAWAWA WdfDeviceCreate called");
 
     if !nt_success(status) {
-        println!("WdfDeviceCreate failed {status:#010X}");
+        println!("WAWAWA WdfDeviceCreate failed {status:#010X}");
         return status;
     }
 
@@ -450,7 +449,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
     let device_context = unsafe { wdf_object_get_device_context(device as WDFOBJECT) };
     unsafe { (*pdo_context).queue = (*device_context).raw_pdo_queue };
 
-    println!("WdfDeviceCreate succeeded");
+    println!("WAWAWA WdfDeviceCreate succeeded");
 
     /*
      //
@@ -477,7 +476,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
 
      */
 
-    println!("WdfDeviceCreate succeeded");
+    println!("WAWAWA WdfDeviceCreate succeeded");
 
     let mut queue_config = WDF_IO_QUEUE_CONFIG {
         Size: core::mem::size_of::<WDF_IO_QUEUE_CONFIG>() as ULONG,
@@ -488,7 +487,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
         ..WDF_IO_QUEUE_CONFIG::default()
     };
 
-    println!("WDF_IO_QUEUE_CONFIG initialized");
+    println!("WAWAWA WDF_IO_QUEUE_CONFIG initialized");
 
     let mut queue : WDFQUEUE = null_mut() as WDFQUEUE;
 
@@ -502,10 +501,10 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
         )
     };
 
-    println!("WdfIoQueueCreate called");
+    println!("WAWAWA WdfIoQueueCreate called");
 
     if !nt_success(status) {
-        println!("WdfIoQueueCreate failed {status:#010X}");
+        println!("WAWAWA WdfIoQueueCreate failed {status:#010X}");
         return status;
     }
 
@@ -532,7 +531,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
         )
     };
 
-    println!("WdfDeviceSetPnpCapabilities called");
+    println!("WAWAWA WdfDeviceSetPnpCapabilities called");
 
     /*
      //
@@ -555,15 +554,15 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
         call_unsafe_wdf_function_binding!(
             WdfDeviceCreateDeviceInterface,
             pdo,
-            &GUID_DEVINTERFACE_ECHO,
+            &GUID_DEVINTERFACE_INTERUSTCEPTION,
             core::ptr::null_mut(),
         )
     };
 
-    println!("WdfDeviceCreateDeviceInterface called");
+    println!("WAWAWA WdfDeviceCreateDeviceInterface called");
 
     if !nt_success(status) {
-        println!("WdfDeviceCreateDeviceInterface failed {status:#010X}");
+        println!("WAWAWA WdfDeviceCreateDeviceInterface failed {status:#010X}");
         return status;
     }
 
@@ -619,14 +618,23 @@ impl KeyboardIoctl {
 unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _output_buffer_length: usize, _input_buffer_length: usize, io_control_code: ULONG) {
     paged_code!();
 
+    println!("WAWA internal_ioctl 1");
+
     let device = call_unsafe_wdf_function_binding!(
         WdfIoQueueGetDevice,
         queue
     );
+
+    println!("WAWA internal_ioctl 2");
+
     let device_context_ptr: *mut DeviceContext =
         unsafe { wdf_object_get_device_context(device as WDFOBJECT) };
 
+    println!("WAWA internal_ioctl 3");
+
     let device_context: &mut DeviceContext = unsafe { device_context_ptr.as_mut().unwrap() }; // TODO: Handle this better.
+
+    println!("WAWA internal_ioctl 4");
 
     let mut forward_request = false;
 
@@ -636,11 +644,15 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
 
     match KeyboardIoctl::try_from(io_control_code as u32) {
         Ok(KeyboardIoctl::KeyboardConnect) => {
+            println!("WAWA internal_ioctl 5.1");
+
             // Only allow one connection at a time. (for now)
             if !device_context.upper_connect_data.class_service.is_null() {
+                println!("WAWA internal_ioctl 5.2");
                 status = STATUS_SHARING_VIOLATION;
             } else {
                 let mut connect_data = ConnectData::default();
+                println!("WAWA internal_ioctl 5.3");
 
                 // Get the input buffer from the request.
                 status = call_unsafe_wdf_function_binding!(
@@ -651,9 +663,12 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
                         core::ptr::null_mut(),
                     );
 
+                println!("WAWA internal_ioctl 5.4");
+
                 if !nt_success(status) {
-                    println!("WdfRequestRetrieveInputBuffer failed {status:#010X}");
+                    println!("WAWAWA WdfRequestRetrieveInputBuffer failed {status:#010X}");
                 } else {
+                    println!("WAWA internal_ioctl 5.5");
                     connect_data.class_device_object = call_unsafe_wdf_function_binding!(
                             WdfDeviceWdmGetDeviceObject,
                             device
@@ -663,11 +678,13 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
             }
         }
         Ok(KeyboardIoctl::KeyboardDisconnect) => {
+            println!("WAWA internal_ioctl 5.6");
             // Disconnect. This is allowed even if there is no outstanding connect.
             // TODO - do we need to free anything?
             device_context.upper_connect_data = ConnectData::default();
         }
         Ok(KeyboardIoctl::KeyboardQueryAttributes) => {
+            println!("WAWA internal_ioctl 5.7");
             // Get keyboard attributes
             forward_request = true;
             completion_context = device_context_ptr as PVOID;
@@ -675,8 +692,9 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
         _ => {}
     }
 
-
+    println!("WAWA internal_ioctl 6");
     if !nt_success(status) {
+        println!("WAWA internal_ioctl 6.1");
         unsafe {
             call_unsafe_wdf_function_binding!(
                 WdfRequestComplete,
@@ -688,6 +706,7 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
     }
 
     if forward_request {
+        println!("WAWA internal_ioctl 7.1");
         let mut output_memory = null_mut() as WDFMEMORY;
 
         status = unsafe {
@@ -698,8 +717,10 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
             )
         };
 
+        println!("WAWA internal_ioctl 7.2");
+
         if !nt_success(status) {
-            println!("WdfRequestRetrieveOutputMemory failed {status:#010X}");
+            println!("WAWAWA WdfRequestRetrieveOutputMemory failed {status:#010X}");
             unsafe {
                 call_unsafe_wdf_function_binding!(
                     WdfRequestComplete,
@@ -711,6 +732,7 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
         }
 
 
+        println!("WAWA internal_ioctl 7.3");
         status = unsafe {
             call_unsafe_wdf_function_binding!(
                 WdfIoTargetFormatRequestForInternalIoctl,
@@ -728,7 +750,7 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
         };
 
         if !nt_success(status) {
-            println!("WdfIoTargetFormatRequestForInternalIoctl failed {status:#010X}");
+            println!("WAWAWA WdfIoTargetFormatRequestForInternalIoctl failed {status:#010X}");
             unsafe {
                 call_unsafe_wdf_function_binding!(
                     WdfRequestComplete,
@@ -739,6 +761,8 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
             return;
         }
 
+        println!("WAWA internal_ioctl 7.4");
+
         unsafe {
             call_unsafe_wdf_function_binding!(
                 WdfRequestSetCompletionRoutine,
@@ -747,6 +771,7 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
                 completion_context,
             );
         }
+        println!("WAWA internal_ioctl 7.5");
 
         let ret = unsafe {
             call_unsafe_wdf_function_binding!(
@@ -760,6 +785,8 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
             )
         };
 
+        println!("WAWA internal_ioctl 7.6");
+
         if ret == 0 {
             status = unsafe {
                 call_unsafe_wdf_function_binding!(
@@ -767,7 +794,7 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
                     request
                 )
             };
-            println!("WdfRequestSend failed {status:#010X}");
+            println!("WAWAWA WdfRequestSend failed {status:#010X}");
             unsafe {
                 call_unsafe_wdf_function_binding!(
                     WdfRequestComplete,
@@ -777,11 +804,14 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
             }
         }
     } else {
+        println!("WAWA internal_ioctl 8.1");
         let options = WDF_REQUEST_SEND_OPTIONS {
             Size: core::mem::size_of::<WDF_REQUEST_SEND_OPTIONS>() as ULONG,
             Flags: WDF_REQUEST_SEND_OPTION_SEND_AND_FORGET as ULONG,
             ..WDF_REQUEST_SEND_OPTIONS::default()
         };
+
+        println!("WAWA internal_ioctl 8.2");
 
         let ret = unsafe {
             call_unsafe_wdf_function_binding!(
@@ -795,6 +825,8 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
             )
         };
 
+        println!("WAWA internal_ioctl 8.3");
+
         if ret == 0 {
             status = unsafe {
                 call_unsafe_wdf_function_binding!(
@@ -802,7 +834,7 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
                     request
                 )
             };
-            println!("WdfRequestSend failed {status:#010X}");
+            println!("WAWAWA WdfRequestSend failed {status:#010X}");
             unsafe {
                 call_unsafe_wdf_function_binding!(
                     WdfRequestComplete,
@@ -817,7 +849,7 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
 #[link_section = "PAGE"]
 extern "C" fn pdo_from_ioctl(queue: WDFQUEUE, request: WDFREQUEST, output_buffer_length: usize, _input_buffer_length: usize, io_control_code: ULONG) {
     paged_code!();
-    println!("pdo_from_ioctl called");
+    println!("WAWAWA pdo_from_ioctl 1");
 
     let mut status = STATUS_NOT_IMPLEMENTED;
     let mut bytes_transferred: ULONG_PTR = 0;
@@ -836,7 +868,7 @@ extern "C" fn pdo_from_ioctl(queue: WDFQUEUE, request: WDFREQUEST, output_buffer
             };
 
             if !nt_success(status) {
-                println!("WdfRequestRetrieveOutputMemory failed {status:#010X}");
+                println!("WAWAWA WdfRequestRetrieveOutputMemory failed {status:#010X}");
             } else {
                 let handle = queue as WDFOBJECT;
                 let device_context: &mut DeviceContext = unsafe { wdf_object_get_device_context(handle).as_mut().unwrap() }; // TODO: Handle this better.
@@ -851,7 +883,7 @@ extern "C" fn pdo_from_ioctl(queue: WDFQUEUE, request: WDFREQUEST, output_buffer
                 };
 
                 if !nt_success(status) {
-                    println!("WdfMemoryCopyFromBuffer failed {status:#010X}");
+                    println!("WAWAWA WdfMemoryCopyFromBuffer failed {status:#010X}");
                 } else {
                     status = STATUS_SUCCESS;
                     bytes_transferred = core::mem::size_of::<KeyboardAttributes>() as ULONG_PTR;
@@ -874,7 +906,7 @@ extern "C" fn pdo_from_ioctl(queue: WDFQUEUE, request: WDFREQUEST, output_buffer
 #[link_section = "PAGE"]
 extern "C" fn pdo_to_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _output_buffer_length: usize, _input_buffer_length: usize, io_control_code: ULONG) {
     paged_code!();
-    println!("pdo_to_ioctl called");
+    println!("WAWAWA pdo_to_ioctl 1");
 
     if io_control_code == PdoKeyboardAttributes as u32 {
         let forward_options = WDF_REQUEST_SEND_OPTIONS {
@@ -913,7 +945,7 @@ extern "C" fn pdo_to_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _output_buffer_
             )};
 
         if !nt_success(status) {
-            println!("WdfRequestForwardToParentDeviceIoQueue failed {status:#010X}");
+            println!("WAWAWA WdfRequestForwardToParentDeviceIoQueue failed {status:#010X}");
             unsafe {
                 call_unsafe_wdf_function_binding!(
                     WdfRequestComplete,
@@ -940,6 +972,7 @@ type ServiceCallback = extern "C" fn(device_object: PDEVICE_OBJECT, input_data_s
 #[link_section = "PAGE"]
 unsafe extern "C" fn service_callback(device_object: PDEVICE_OBJECT, input_data_start: *mut KeyboardInputData, input_data_end: *mut KeyboardInputData, input_data_consumed: PULONG) {
     paged_code!();
+    println!("WAWAWA service_callback 1");
 
     let device = call_unsafe_wdf_function_binding!(
         WdfWdmDeviceGetWdfDeviceHandle,
@@ -949,17 +982,17 @@ unsafe extern "C" fn service_callback(device_object: PDEVICE_OBJECT, input_data_
     let device_context: &mut DeviceContext =
         unsafe { wdf_object_get_device_context(device as WDFOBJECT).as_mut().unwrap() }; // TODO: Handle this better.
 
-    println!("Service callback called for device");
+    println!("WAWAWA Service callback called for device");
     let input_data_length = (input_data_end as usize - input_data_start as usize) / core::mem::size_of::<KeyboardInputData>();
     if input_data_length > 0 {
         let input_data_slice = unsafe { core::slice::from_raw_parts(input_data_start, input_data_length) };
         for (i, input_data) in input_data_slice.iter().enumerate() {
-            println!("Input data: {}", i);
-            println!("  unit_id: {}", input_data.unit_id);
-            println!("  make_code: {}", input_data.make_code);
-            println!("  flags: {}", input_data.flags);
-            println!("  reserved: {}", input_data.reserved);
-            println!("  extra_information: {}", input_data.extra_information);
+            println!("WAWAWA Input data: {}", i);
+            println!("WAWAWA   unit_id: {}", input_data.unit_id);
+            println!("WAWAWA   make_code: {}", input_data.make_code);
+            println!("WAWAWA   flags: {}", input_data.flags);
+            println!("WAWAWA   reserved: {}", input_data.reserved);
+            println!("WAWAWA   extra_information: {}", input_data.extra_information);
         }
     }
 
@@ -974,6 +1007,7 @@ unsafe extern "C" fn service_callback(device_object: PDEVICE_OBJECT, input_data_
 #[link_section = "PAGE"]
 unsafe extern "C" fn completion_routine(request: WDFREQUEST, _handle: WDFIOTARGET, params: *mut WDF_REQUEST_COMPLETION_PARAMS, context: WDFCONTEXT) {
     paged_code!();
+    println!("WAWAWA completion_routine 1");
 
     let params_ioctl = unsafe { &mut (*params).Parameters.Ioctl };
     let params_status = unsafe { (*params).IoStatus.__bindgen_anon_1.Status };

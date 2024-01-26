@@ -39,7 +39,7 @@ interustception.sys = 1
 %MfgName% = Standard,NT$ARCH$
 
 [Standard.NT$ARCH$]
-%interustception.DeviceDesc% = interustception, TS_INPT\TS_KBD
+%interustception.DeviceDesc% = interustception, *PNP0303
 
 ;
 ; General installation section
@@ -117,9 +117,9 @@ REG_DWORD      = 0x00010001
 ProviderName = "TODO-Set-Provider"
 MfgName      = "TODO-Set-Manufacturer"
 
-interustception.DeviceDesc = "Interustception v2"
+interustception.DeviceDesc = "Interustception v3"
 
 ; Make sure the service description is unique to avoid collision with another INF.
-interustception.SvcDesc = "Interustception Service v2"
+interustception.SvcDesc = "Interustception Service v3"
 
 DiskId1 = "Interustception Install Disk"
