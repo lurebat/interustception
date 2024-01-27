@@ -1,2 +1,12 @@
 /target
 /Cargo.lock
+/DriverCertificate.cer
+/.idea/encodings.xml
+/.idea/git_toolbox_prj.xml
+/keyboard.sys
+/.idea/modules.xml
+/mouse.sys
+/.idea/palantir-java-format.xml
+/.idea/codeStyles/Project.xml
+/.cargo-make-loadscripts/rust-driver-makefile.toml
+/.idea/vcs.xml

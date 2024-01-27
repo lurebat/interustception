@@ -3,8 +3,7 @@
 
 use wdk::{nt_success, paged_code, println};
 use wdk_sys::{macros, ntddk::KeGetCurrentIrql, NTSTATUS, WDFDRIVER, *};
-
-use crate::{device};
+use wdk_sys::macros::call_unsafe_wdf_function_binding;
 
 extern crate alloc;
 
@@ -93,5 +92,16 @@ extern "C" fn device_add(_driver: WDFDRIVER, device_init: PWDFDEVICE_INIT) -> NT
                 .expect("WDF should never provide a null pointer for device_init")
         };
 
-    unsafe { return device::echo_device_create(device_init) }
+
+    call_unsafe_wdf_function_binding!(
+        WdfDeviceInitSetFilter,
+        device_init,
+        FILE_DEVICE_KEYBOARD);
+
+    let mut attributes = WDF_OBJECT_ATTRIBUTES {
+        Size: core::mem::size_of::<WDF_OBJECT_ATTRIBUTES>() as ULONG,
+        ExecutionLevel: _WDF_EXECUTION_LEVEL::WdfExecutionLevelInheritFromParent,
+        SynchronizationScope: _WDF_SYNCHRONIZATION_SCOPE::WdfSynchronizationScopeInheritFromParent,
+        ..WDF_OBJECT_ATTRIBUTES::default()
+    };
 }

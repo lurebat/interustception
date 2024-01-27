@@ -1,4 +1,4 @@
-// Copyright (c) Microsoft Corporation.
+/*// Copyright (c) Microsoft Corporation.
 // License: MIT OR Apache-2.0
 
 use core::sync::atomic::AtomicU32;
@@ -1034,3 +1034,4 @@ unsafe extern "C" fn completion_routine(request: WDFREQUEST, _handle: WDFIOTARGE
         status
     );
 }
+*/
