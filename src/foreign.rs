@@ -1,7 +1,7 @@
 use wdk_sys::{PDEVICE_OBJECT, PVOID};
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct KeyboardTypematicParameters {
     pub unit_id: u16,
     pub rate: u16,
@@ -9,7 +9,7 @@ pub struct KeyboardTypematicParameters {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct KeyboardId {
     pub r#type: u8,
     pub subtype: u8,
@@ -17,7 +17,7 @@ pub struct KeyboardId {
 
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct KeyboardInputData {
     pub unit_id: u16,
     pub make_code: u16,
@@ -28,7 +28,7 @@ pub struct KeyboardInputData {
 
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct KeyboardAttributes {
     pub keyboard_identifier: KeyboardId,
     pub keyboard_mode: u16,
@@ -41,7 +41,7 @@ pub struct KeyboardAttributes {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct ConnectData {
     pub class_device_object: PDEVICE_OBJECT,
     pub class_service: PVOID,

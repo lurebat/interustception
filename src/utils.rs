@@ -1,11 +1,11 @@
 use wdk_sys::ntddk::DbgBreakPointWithStatus;
 #[macro_export]
 macro_rules! kernel_callback {
-    (fn $fn_name:ident($($param_name:ident: $param_type:ty),*) -> $ret_type:ty {
+    (fn $fn_name:ident( $($params:tt)* ) -> $ret_type:ty {
         $($body:tt)*
     }) => {
         #[link_section = "PAGE"]
-        $vis unsafe extern "C" fn $fn_name($($param_name: $param_type),*) -> $ret_type {
+        pub unsafe extern "C" fn $fn_name( $($params)* ) -> $ret_type {
             wdk::paged_code!();
             $($body)*
         }
@@ -36,23 +36,28 @@ macro_rules! init_object {
     }};
 }
 
+pub const fn ctl_code(device_type: u32, function: u32, method: u32, access: u32) -> u32 {
+    (device_type << 16) | (access << 14) | (function << 2) | method
+}
 
-const DEBUG: bool = true;
+pub const DEBUG: bool = true;
+
+#[macro_export]
 macro_rules! dbg {
     // NOTE: We cannot use `concat!` to make a static string as a format argument
     // of `eprintln!` because `file!` could contain a `{` or
     // `$val` expression could be a block (`{ .. }`), in which case the `eprintln!`
     // will be malformed.
     () => {
-        $crate::debug_print!("[{}:{}]", $crate::file!(), $crate::line!())
+        $crate::debug_print!("[WAWAWA] [{}:{}]", core::file!(), core::line!())
     };
     ($val:expr $(,)?) => {
         // Use of `match` here is intentional because it affects the lifetimes
         // of temporaries - https://stackoverflow.com/a/48732525/1063961
         match $val {
             tmp => {
-                $crate::debug_print!("[{}:{}] {} = {:#?}",
-                    $crate::file!(), $crate::line!(), $crate::stringify!($val), &tmp);
+                $crate::debug_print!("[WAWAWA] [{}:{}] {} = {:#?}",
+                    core::file!(), core::line!(), core::stringify!($val), &tmp);
                 tmp
             }
         }
@@ -66,16 +71,14 @@ macro_rules! dbg {
 #[macro_export]
 macro_rules! debug_print {
     ($($arg:tt)*) => {
-        if DEBUG {
+        if $crate::utils::DEBUG {
             wdk::println!($($arg)*);
         }
     };
 }
 fn breakpoint() {
     if DEBUG {
-        unsafe {
-            debug_print!("Breakpoint");
-            unsafe { DbgBreakPointWithStatus(0) };
-        }
+        debug_print!("Breakpoint");
+        unsafe { DbgBreakPointWithStatus(0) };
     }
 }
