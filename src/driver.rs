@@ -2,6 +2,7 @@
 // License: MIT OR Apache-2.0
 
 use core::mem;
+use core::mem::transmute;
 use wdk::{nt_success, paged_code};
 use wdk_sys::{macros, ntddk::KeGetCurrentIrql, NTSTATUS, WDFDRIVER, *};
 use wdk_sys::_WDF_IO_QUEUE_DISPATCH_TYPE::WdfIoQueueDispatchParallel;
@@ -257,12 +258,14 @@ unsafe extern "C" fn keyboard_trap_service_callback(device_object: PDEVICE_OBJEC
         dbg!(current);
     }
 
+    let data = unsafe { (*device_context).upper_connect_data };
 
-    if !unsafe{ (*device_context).upper_connect_data}.class_service.is_null() {
-        dbg!();
-        let callback: ServiceCallback = unsafe { core::mem::transmute(unsafe{ (*device_context).upper_connect_data}.class_service) };
+    if !data.class_service.is_null() {
+        dbg!(data.class_service);
+        let callback: ServiceCallback = unsafe {transmute(data.class_service as *const ()) };
+        dbg!(callback);
 
-        callback(device_object, input_data_start, input_data_end, input_data_consumed);
+        (callback)(data.class_device_object, input_data_start, input_data_end, input_data_consumed);
     }
 }
 
