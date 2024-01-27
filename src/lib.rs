@@ -54,7 +54,8 @@ mod foreign;
 mod utils;
 
 use wdf_object_context::{wdf_declare_context_type};
-use crate::foreign::{ConnectData};
+use crate::foreign::{ConnectData, KeyboardAttributes};
+use crate::wdf_object_context::wdf_declare_context_type_with_name;
 
 #[cfg(not(test))]
 #[global_allocator]
@@ -82,6 +83,16 @@ impl Default for ConnectData {
 }
 
 pub struct DeviceContext {
+    raw_pdo_queue: WDFQUEUE,
     upper_connect_data: ConnectData,
+
+    keyboard_attributes: KeyboardAttributes,
 }
 wdf_declare_context_type!(DeviceContext);
+
+pub struct PdoContext {
+    instance: u32,
+    queue: WDFQUEUE
+}
+
+wdf_declare_context_type_with_name!(PdoContext, get_pdo_context);

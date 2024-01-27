@@ -1,4 +1,4 @@
-/*// Copyright (c) Microsoft Corporation.
+// Copyright (c) Microsoft Corporation.
 // License: MIT OR Apache-2.0
 
 use core::sync::atomic::AtomicU32;
@@ -8,7 +8,7 @@ use wdk_sys::_WDF_REQUEST_SEND_OPTIONS_FLAGS::WDF_REQUEST_SEND_OPTION_SEND_AND_F
 use wdk_sys::_WDF_REQUEST_TYPE::WdfRequestTypeDeviceControlInternal;
 use wdk_sys::_WDF_TRI_STATE::{WdfTrue, WdfUseDefault};
 use wdk_sys::macros::call_unsafe_wdf_function_binding;
-use wdk_sys::ntddk::DbgBreakPointWithStatus;
+use wdk_sys::ntddk::KeGetCurrentIrql;
 
 use crate::{
     wdf_object_context::*,
@@ -33,7 +33,7 @@ static mut INSTANCES: AtomicU32 = AtomicU32::new(0);
 ///
 /// * `NTSTATUS`
 #[link_section = "PAGE"]
-pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) -> NTSTATUS {
+pub(crate) unsafe extern "C" fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) -> NTSTATUS {
     paged_code!();
 
     println!("WAWAWA echo_device_create called");
@@ -97,6 +97,7 @@ pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) ->
         EvtIoInternalDeviceControl: Some(internal_ioctl),
         ..WDF_IO_QUEUE_CONFIG::default()
     };
+    queue_config.Settings.Parallel.NumberOfPresentedRequests = ULONG::MAX;
 
     println!("WAWAWA WDF_IO_QUEUE_CONFIG initialized");
 
@@ -128,6 +129,8 @@ pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) ->
         EvtIoInternalDeviceControl: Some(pdo_from_ioctl),
         ..WDF_IO_QUEUE_CONFIG::default()
     };
+
+    pdo_queue_config.Settings.Parallel.NumberOfPresentedRequests = ULONG::MAX;
 
     println!("WAWAWA WDF_IO_QUEUE_CONFIG initialized");
 
@@ -169,13 +172,12 @@ pub(crate) unsafe fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) ->
     nt_status
 }
 
+/*DEFINE_GUID( GUID_DEVCLASS_KEYBOARD,            0x4d36e96bL, 0xe325, 0x11ce, 0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18 );*/
 static GUID_CLASS_KEYBOARD: GUID = GUID {
-    Data1: 0x4D36E96Bu32,
-    Data2: 0xE325u16,
-    Data3: 0x11CEu16,
-    Data4: [
-        0xBFu8, 0xC1u8, 0x08u8, 0x00u8, 0x2Bu8, 0xE1u8, 0x03u8, 0x18u8,
-    ],
+    Data1: 0x4d36_e96bu64 as u32,
+    Data2: 0xe325,
+    Data3: 0x11ce,
+    Data4: [0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18],
 };
 
 // the string is {A65C87F9-BE02-4ed9-92EC-012D416169FA}\\Interustception\0
@@ -595,20 +597,34 @@ enum KeyboardIoctl {
 }
 
 impl KeyboardIoctl {
-    fn try_from(value: u32) -> Result<Self, u32> {
-        match value {
-            0x801 => Ok(KeyboardIoctl::SetPrecedence),
-            0x802 => Ok(KeyboardIoctl::GetPrecedence),
-            0x804 => Ok(KeyboardIoctl::SetFiler),
-            0x808 => Ok(KeyboardIoctl::GetFilter),
-            0x810 => Ok(KeyboardIoctl::SetEvent),
-            0x820 => Ok(KeyboardIoctl::Write),
-            0x840 => Ok(KeyboardIoctl::Read),
-            0x880 => Ok(KeyboardIoctl::GetHardwareId),
-            0x80 => Ok(KeyboardIoctl::KeyboardConnect),
-            0x100 => Ok(KeyboardIoctl::KeyboardDisconnect),
-            720896u32 => Ok(KeyboardIoctl::KeyboardQueryAttributes),
-            _ => Err(value),
+    const fn try_from(value: u32) -> Result<Self, u32> {
+        use KeyboardIoctl::*;
+        if value == SetPrecedence as u32 {
+            Ok(SetPrecedence)
+        } else if value == GetPrecedence as u32 {
+            Ok(GetPrecedence)
+        } else if value == SetFiler as u32 {
+            Ok(SetFiler)
+        } else if value == GetFilter as u32 {
+            Ok(GetFilter)
+        } else if value == SetEvent as u32 {
+            Ok(SetEvent)
+        } else if value == Write as u32 {
+            Ok(Write)
+        } else if value == Read as u32 {
+            Ok(Read)
+        } else if value == GetHardwareId as u32 {
+            Ok(GetHardwareId)
+        } else if value == KeyboardConnect as u32 {
+            Ok(KeyboardConnect)
+        } else if value == KeyboardDisconnect as u32 {
+            Ok(KeyboardDisconnect)
+        } else if value == KeyboardQueryAttributes as u32 {
+            Ok(KeyboardQueryAttributes)
+        } else if value == PdoKeyboardAttributes as u32 {
+            Ok(PdoKeyboardAttributes)
+        } else {
+            Err(value)
         }
     }
 }
@@ -627,12 +643,9 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
 
     println!("WAWA internal_ioctl 2");
 
-    let device_context_ptr: *mut DeviceContext =
-        unsafe { wdf_object_get_device_context(device as WDFOBJECT) };
+    let device_context_ptr = unsafe { wdf_object_get_device_context(device as WDFOBJECT) };
 
     println!("WAWA internal_ioctl 3");
-
-    let device_context: &mut DeviceContext = unsafe { device_context_ptr.as_mut().unwrap() }; // TODO: Handle this better.
 
     println!("WAWA internal_ioctl 4");
 
@@ -647,11 +660,11 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
             println!("WAWA internal_ioctl 5.1");
 
             // Only allow one connection at a time. (for now)
-            if !device_context.upper_connect_data.class_service.is_null() {
+            if !(unsafe { (*device_context_ptr).upper_connect_data}.class_service.is_null()) {
                 println!("WAWA internal_ioctl 5.2");
                 status = STATUS_SHARING_VIOLATION;
             } else {
-                let mut connect_data = ConnectData::default();
+                let mut connect_data = &mut ConnectData::default();
                 println!("WAWA internal_ioctl 5.3");
 
                 // Get the input buffer from the request.
@@ -659,7 +672,7 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
                         WdfRequestRetrieveInputBuffer,
                         request,
                         core::mem::size_of::<ConnectData>(),
-                        &mut connect_data as *mut _ as *mut _,
+                        (&mut connect_data) as *mut _ as *mut _,
                         core::ptr::null_mut(),
                     );
 
@@ -669,6 +682,10 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
                     println!("WAWAWA WdfRequestRetrieveInputBuffer failed {status:#010X}");
                 } else {
                     println!("WAWA internal_ioctl 5.5");
+                    unsafe {
+                        (*device_context_ptr).upper_connect_data = *connect_data;
+                    }
+
                     connect_data.class_device_object = call_unsafe_wdf_function_binding!(
                             WdfDeviceWdmGetDeviceObject,
                             device
@@ -681,7 +698,7 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
             println!("WAWA internal_ioctl 5.6");
             // Disconnect. This is allowed even if there is no outstanding connect.
             // TODO - do we need to free anything?
-            device_context.upper_connect_data = ConnectData::default();
+            unsafe{ (*device_context_ptr).upper_connect_data = ConnectData::default(); }
         }
         Ok(KeyboardIoctl::KeyboardQueryAttributes) => {
             println!("WAWA internal_ioctl 5.7");
@@ -969,9 +986,7 @@ extern "C" fn pdo_to_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _output_buffer_
 type ServiceCallback = extern "C" fn(device_object: PDEVICE_OBJECT, input_data_start: *mut KeyboardInputData, input_data_end: *mut KeyboardInputData, input_data_consumed: PULONG);
 
 
-#[link_section = "PAGE"]
 unsafe extern "C" fn service_callback(device_object: PDEVICE_OBJECT, input_data_start: *mut KeyboardInputData, input_data_end: *mut KeyboardInputData, input_data_consumed: PULONG) {
-    paged_code!();
     println!("WAWAWA service_callback 1");
 
     let device = call_unsafe_wdf_function_binding!(
@@ -987,12 +1002,7 @@ unsafe extern "C" fn service_callback(device_object: PDEVICE_OBJECT, input_data_
     if input_data_length > 0 {
         let input_data_slice = unsafe { core::slice::from_raw_parts(input_data_start, input_data_length) };
         for (i, input_data) in input_data_slice.iter().enumerate() {
-            println!("WAWAWA Input data: {}", i);
-            println!("WAWAWA   unit_id: {}", input_data.unit_id);
-            println!("WAWAWA   make_code: {}", input_data.make_code);
-            println!("WAWAWA   flags: {}", input_data.flags);
-            println!("WAWAWA   reserved: {}", input_data.reserved);
-            println!("WAWAWA   extra_information: {}", input_data.extra_information);
+            dbg!(input_data);
         }
     }
 
@@ -1000,7 +1010,7 @@ unsafe extern "C" fn service_callback(device_object: PDEVICE_OBJECT, input_data_
     if !device_context.upper_connect_data.class_service.is_null() {
         let callback: ServiceCallback = unsafe { core::mem::transmute(device_context.upper_connect_data.class_service) };
 
-        callback(device_object, input_data_start, input_data_end, input_data_consumed);
+        callback(device_context.upper_connect_data.class_device_object, input_data_start, input_data_end, input_data_consumed);
     }
 }
 
@@ -1015,17 +1025,16 @@ unsafe extern "C" fn completion_routine(request: WDFREQUEST, _handle: WDFIOTARGE
     let buffer = params_ioctl.Output.Buffer;
     let mut status = params_status;
 
-    if nt_success(status) && unsafe { (*params).Type } == WdfRequestTypeDeviceControlInternal && params_ioctl.IoControlCode == KeyboardIoctl::KeyboardQueryAttributes as u32 {
-        if params_ioctl.Output.Length >= core::mem::size_of::<KeyboardAttributes>() {
-            let device_context: &mut DeviceContext = unsafe { core::mem::transmute(context) };
-            status = call_unsafe_wdf_function_binding!(
-                WdfMemoryCopyToBuffer,
-                buffer,
-                params_ioctl.Output.Offset,
-                (&mut device_context.keyboard_attributes) as *mut _ as *mut _,
-                core::mem::size_of::<KeyboardAttributes>(),
-            );
-        }
+    if nt_success(status) && unsafe { (*params).Type } == WdfRequestTypeDeviceControlInternal && params_ioctl.IoControlCode == KeyboardIoctl::KeyboardQueryAttributes as u32 && params_ioctl.Output.Length >= core::mem::size_of::<KeyboardAttributes>() {
+        let device_context: &mut DeviceContext = unsafe { core::mem::transmute(context) };
+        status = call_unsafe_wdf_function_binding!(
+            WdfMemoryCopyToBuffer,
+            buffer,
+            params_ioctl.Output.Offset,
+            (&mut device_context.keyboard_attributes) as *mut _ as *mut _,
+            core::mem::size_of::<KeyboardAttributes>(),
+        );
+        dbg!(device_context.keyboard_attributes);
     }
 
     call_unsafe_wdf_function_binding!(
@@ -1034,4 +1043,4 @@ unsafe extern "C" fn completion_routine(request: WDFREQUEST, _handle: WDFIOTARGE
         status
     );
 }
-*/
+
