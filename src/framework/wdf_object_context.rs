@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // License: MIT OR Apache-2.0
 
-use wdk_sys::{PCWDF_OBJECT_CONTEXT_TYPE_INFO, WDF_OBJECT_CONTEXT_TYPE_INFO};
+use wdk_sys::{PCWDF_OBJECT_CONTEXT_TYPE_INFO, WDF_OBJECT_CONTEXT_TYPE_INFO, WDFOBJECT};
 
 #[repr(transparent)]
 pub struct WDFObjectContextTypeInfo(WDF_OBJECT_CONTEXT_TYPE_INFO);
@@ -21,7 +21,7 @@ impl WDFObjectContextTypeInfo {
         unsafe { *inner }.UniqueType
     }
 }
-
+#[macro_export]
 macro_rules! wdf_get_context_type_info {
     ($context_type:ident) => {
         paste::paste! {
@@ -32,13 +32,14 @@ macro_rules! wdf_get_context_type_info {
 
 pub(crate) use wdf_get_context_type_info;
 
+#[macro_export]
 macro_rules! wdf_declare_context_type_with_name {
     ($context_type:ident , $casting_function:ident) => {
         paste::paste! {
             type [<WDFPointerType$context_type>] = *mut $context_type;
 
             #[link_section = ".data"]
-            pub static [<WDF_ $context_type:snake:upper _TYPE_INFO>]: crate::wdf_object_context::WDFObjectContextTypeInfo = crate::wdf_object_context::WDFObjectContextTypeInfo::new(WDF_OBJECT_CONTEXT_TYPE_INFO {
+            pub static [<WDF_ $context_type:snake:upper _TYPE_INFO>]: crate::framework::wdf_object_context::WDFObjectContextTypeInfo = crate::framework::wdf_object_context::WDFObjectContextTypeInfo::new(WDF_OBJECT_CONTEXT_TYPE_INFO {
                 Size: core::mem::size_of::<WDF_OBJECT_CONTEXT_TYPE_INFO>() as ULONG,
                 ContextName: concat!(stringify!($context_type),'\0').as_bytes().as_ptr().cast(),
                 ContextSize: core::mem::size_of::<$context_type>(),
@@ -46,13 +47,23 @@ macro_rules! wdf_declare_context_type_with_name {
                 EvtDriverGetUniqueContextType: None,
             });
 
-            pub unsafe fn $casting_function(handle: WDFOBJECT) -> [<WDFPointerType$context_type>] {
+            pub unsafe fn $casting_function(handle: wdk_sys::WDFOBJECT) -> [<WDFPointerType$context_type>] {
                 unsafe {
                     macros::call_unsafe_wdf_function_binding!(
                         WdfObjectGetTypedContextWorker,
                         handle,
-                        crate::wdf_object_context::wdf_get_context_type_info!($context_type),
+                        crate::framework::wdf_object_context::wdf_get_context_type_info!($context_type),
                     ).cast()
+                }
+            }
+
+            impl crate::framework::Context for $context_type {
+                fn get_context_type_info() -> wdk_sys::PCWDF_OBJECT_CONTEXT_TYPE_INFO {
+                    crate::framework::wdf_object_context::wdf_get_context_type_info!($context_type)
+                }
+
+                unsafe fn get_context(handle: wdk_sys::WDFOBJECT) -> *mut $context_type {
+                    $casting_function(handle)
                 }
             }
         }
@@ -61,12 +72,19 @@ macro_rules! wdf_declare_context_type_with_name {
 
 pub(crate) use wdf_declare_context_type_with_name;
 
+#[macro_export]
 macro_rules! wdf_declare_context_type {
     ($context_type:ident) => {
         paste::paste! {
-            crate::wdf_object_context::wdf_declare_context_type_with_name!($context_type, [<wdf_object_get_ $context_type:snake>]);
+            crate::framework::wdf_object_context::wdf_declare_context_type_with_name!($context_type, [<wdf_object_get_ $context_type:snake>]);
         }
     };
 }
 
 pub(crate) use wdf_declare_context_type;
+
+pub(crate) trait Context {
+    fn get_context_type_info() -> PCWDF_OBJECT_CONTEXT_TYPE_INFO;
+
+    unsafe fn get_context(handle: WDFOBJECT) -> *mut Self;
+}

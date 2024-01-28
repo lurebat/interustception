@@ -1,4 +1,12 @@
-use wdk_sys::{PDEVICE_OBJECT, PVOID};
+use wdk_sys::{GUID, PDEVICE_OBJECT, PVOID};
+
+/*DEFINE_GUID( CLASS_KEYBOARD,            0x4d36e96bL, 0xe325, 0x11ce, 0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18 );*/
+pub static GUID_CLASS_KEYBOARD: GUID = GUID {
+    Data1: 0x4d36_e96bu64 as u32,
+    Data2: 0xe325,
+    Data3: 0x11ce,
+    Data4: [0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18],
+};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]

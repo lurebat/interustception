@@ -28,10 +28,9 @@ macro_rules! driver_entry { (($driver:ident, $registry_path:ident) { $($body:tt)
 
 #[macro_export]
 macro_rules! init_object {
-    ($type:ty, { $($field:ident : $value:expr),* $(,)* }) => {{
+    ($type:ty) => {{
         let mut object = <$type>::default();
-        $(object.$field = $value;)*
-        object.Size = core::mem::size_of::<$type>() as ULONG;
+        object.Size = core::mem::size_of::<$type>() as wdk_sys::ULONG;
         object
     }};
 }
@@ -43,20 +42,32 @@ pub const fn ctl_code(device_type: u32, function: u32, method: u32, access: u32)
 pub const DEBUG: bool = true;
 
 #[macro_export]
+macro_rules! debug_print {
+    ($($arg:tt)*) => {
+        if $crate::framework::utils::DEBUG {
+            wdk::println!($($arg)*);
+        }
+    };
+}
+
+pub(crate) use debug_print;
+
+
+#[macro_export]
 macro_rules! dbg {
     // NOTE: We cannot use `concat!` to make a static string as a format argument
     // of `eprintln!` because `file!` could contain a `{` or
     // `$val` expression could be a block (`{ .. }`), in which case the `eprintln!`
     // will be malformed.
     () => {
-        $crate::debug_print!("[WAWAWA] [{}:{}]", core::file!(), core::line!())
+        $crate::framework::utils::debug_print!("[WAWAWA] [{}:{}]", core::file!(), core::line!())
     };
     ($val:expr $(,)?) => {
         // Use of `match` here is intentional because it affects the lifetimes
         // of temporaries - https://stackoverflow.com/a/48732525/1063961
         match $val {
             tmp => {
-                $crate::debug_print!("[WAWAWA] [{}:{}] {} = {:#?}",
+                $crate::framework::utils::debug_print!("[WAWAWA] [{}:{}] {} = {:#?}",
                     core::file!(), core::line!(), core::stringify!($val), &tmp);
                 tmp
             }
@@ -67,15 +78,6 @@ macro_rules! dbg {
     };
 }
 
-
-#[macro_export]
-macro_rules! debug_print {
-    ($($arg:tt)*) => {
-        if $crate::utils::DEBUG {
-            wdk::println!($($arg)*);
-        }
-    };
-}
 fn breakpoint() {
     if DEBUG {
         debug_print!("Breakpoint");

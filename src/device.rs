@@ -2,6 +2,8 @@
 // License: MIT OR Apache-2.0
 
 use core::sync::atomic::AtomicU32;
+use nt_string::nt_unicode_str;
+use nt_string::unicode_string::NtUnicodeStr;
 use wdk::{nt_success, paged_code, println};
 use wdk_sys::{*};
 use wdk_sys::_WDF_REQUEST_SEND_OPTIONS_FLAGS::WDF_REQUEST_SEND_OPTION_SEND_AND_FORGET;
@@ -11,202 +13,53 @@ use wdk_sys::macros::call_unsafe_wdf_function_binding;
 use wdk_sys::ntddk::KeGetCurrentIrql;
 
 use crate::{
-    wdf_object_context::*,
+    framework::wdf_object_context::*,
     DeviceContext,
     *,
 };
 use crate::device::KeyboardIoctl::PdoKeyboardAttributes;
 use crate::foreign::{ConnectData, KeyboardAttributes, KeyboardInputData};
+use crate::framework::{DeviceBuilder, QueueBuilder};
 
 static mut INSTANCES: AtomicU32 = AtomicU32::new(0);
 
 
-/// Worker routine called to create a device and its software resources.
-///
-/// # Arguments:
-///
-/// * `device_init` - Pointer to an opaque init structure. Memory for this
-///   structure will be freed by the framework when the WdfDeviceCreate
-///   succeeds. So don't access the structure after that point.
-///
-/// # Return value:
-///
-/// * `NTSTATUS`
-#[link_section = "PAGE"]
-pub(crate) unsafe extern "C" fn echo_device_create(mut device_init: &mut WDFDEVICE_INIT) -> NTSTATUS {
-    paged_code!();
 
-    println!("WAWAWA echo_device_create called");
+pub(crate) fn device_create(device_init: &mut WDFDEVICE_INIT) -> framework::Result<> {
+    let mut device = DeviceBuilder::new(device_init)
+        .as_filter_device()
+        .with_device_type(FILE_DEVICE_KEYBOARD)
+        .build_with_context::<DeviceContext>()?;
 
-    call_unsafe_wdf_function_binding!(
-        WdfFdoInitSetFilter,
-        device_init
-    );
+    let context = device.context_mut();
 
-    println!("WAWAWA WdfFdoInitSetFilter called");
+    QueueBuilder::new()
+        .default_queue()
+        .parallel_dispatch()
+        .internal_device_control(Some(internal_ioctl))
+        .create(device.handle())?;
 
-    call_unsafe_wdf_function_binding!(
-        WdfDeviceInitSetDeviceType,
-        device_init,
-        FILE_DEVICE_KEYBOARD
-    );
+    let pdo_queue = QueueBuilder::new()
+        .default_queue()
+        .parallel_dispatch()
+        .internal_device_control(Some(pdo_from_ioctl))
+        .create(device.handle())?;
 
-    println!("WAWAWA WdfDeviceInitSetDeviceType called");
-
-    let mut attributes = WDF_OBJECT_ATTRIBUTES {
-        Size: core::mem::size_of::<WDF_OBJECT_ATTRIBUTES>() as ULONG,
-        ExecutionLevel: _WDF_EXECUTION_LEVEL::WdfExecutionLevelInheritFromParent,
-        SynchronizationScope: _WDF_SYNCHRONIZATION_SCOPE::WdfSynchronizationScopeInheritFromParent,
-        ..WDF_OBJECT_ATTRIBUTES::default()
-    };
-
-    attributes.ContextTypeInfo = wdf_get_context_type_info!(DeviceContext);
-
-    println!("WAWAWA WdfDeviceInitSetDeviceType called");
-
-    let mut device = WDF_NO_HANDLE as WDFDEVICE;
-    let nt_status = unsafe {
-        call_unsafe_wdf_function_binding!(
-            WdfDeviceCreate,
-            (core::ptr::addr_of_mut!(device_init)) as *mut *mut WDFDEVICE_INIT,
-            &mut attributes,
-            &mut device,
-        )
-    };
-
-    println!("WAWAWA WdfDeviceCreate called");
-
-    if !nt_success(nt_status) {
-        println!("WAWAWA Error: WdfDeviceCreate failed {nt_status:#010X}");
-        return nt_status;
-    }
-
-    //
-    // Configure the default queue to be Parallel. Do not use sequential queue
-    // if this driver is going to be filtering PS2 ports because it can lead to
-    // deadlock. The PS2 port driver sends a request to the top of the stack when it
-    // receives an ioctl request and waits for it to be completed. If you use a
-    // a sequential queue, this request will be stuck in the queue because of the
-    // outstanding ioctl request sent earlier to the port driver.
-    //
-    let mut queue_config = WDF_IO_QUEUE_CONFIG {
-        Size: core::mem::size_of::<WDF_IO_QUEUE_CONFIG>() as ULONG,
-        PowerManaged: _WDF_TRI_STATE::WdfUseDefault,
-        DefaultQueue: true as u8,
-        DispatchType: _WDF_IO_QUEUE_DISPATCH_TYPE::WdfIoQueueDispatchParallel,
-        EvtIoInternalDeviceControl: Some(internal_ioctl),
-        ..WDF_IO_QUEUE_CONFIG::default()
-    };
-    queue_config.Settings.Parallel.NumberOfPresentedRequests = ULONG::MAX;
-
-    println!("WAWAWA WDF_IO_QUEUE_CONFIG initialized");
-
-    // Create queue.
-    let mut nt_status = unsafe {
-        call_unsafe_wdf_function_binding!(
-            WdfIoQueueCreate,
-            device,
-            &mut queue_config,
-            WDF_NO_OBJECT_ATTRIBUTES,
-            WDF_NO_HANDLE as *mut WDFQUEUE,
-        )
-    };
-
-    println!("WAWAWA WdfIoQueueCreate called");
-
-    if !nt_success(nt_status) {
-        println!("WAWAWA WdfIoQueueCreate failed {nt_status:#010X}");
-        return nt_status;
-    }
-
-    println!("WAWAWA WdfIoQueueCreate succeeded");
-
-    let mut pdo_queue_config = WDF_IO_QUEUE_CONFIG {
-        Size: core::mem::size_of::<WDF_IO_QUEUE_CONFIG>() as ULONG,
-        PowerManaged: _WDF_TRI_STATE::WdfUseDefault,
-        DefaultQueue: false as u8,
-        DispatchType: _WDF_IO_QUEUE_DISPATCH_TYPE::WdfIoQueueDispatchParallel,
-        EvtIoInternalDeviceControl: Some(pdo_from_ioctl),
-        ..WDF_IO_QUEUE_CONFIG::default()
-    };
-
-    pdo_queue_config.Settings.Parallel.NumberOfPresentedRequests = ULONG::MAX;
-
-    println!("WAWAWA WDF_IO_QUEUE_CONFIG initialized");
-
-    let mut pdo_queue = null_mut() as WDFQUEUE;
-
-    println!("WAWAWA WdfIoQueueCreate called");
-
-    nt_status = unsafe {
-        call_unsafe_wdf_function_binding!(
-            WdfIoQueueCreate,
-            device,
-            &mut pdo_queue_config,
-            WDF_NO_OBJECT_ATTRIBUTES,
-            &mut pdo_queue,
-        )
-    };
-
-    println!("WAWAWA WdfIoQueueCreate called");
-
-    if !nt_success(nt_status) {
-        println!("WAWAWA WdfIoQueueCreate for pdo failed {nt_status:#010X}");
-        return nt_status;
-    }
-
-    println!("WAWAWA WdfIoQueueCreate for pdo succeeded");
-
-    let device_context: *mut DeviceContext =
-        unsafe { wdf_object_get_device_context(device as WDFOBJECT) };
-    unsafe { (*device_context).raw_pdo_queue = pdo_queue };
+    context.raw_pdo_queue = pdo_queue.handle();
 
     let current = unsafe {
         INSTANCES.fetch_add(1, core::sync::atomic::Ordering::SeqCst)
     } + 1;
 
-
-    nt_status = create_pdo(device, current);
-
-
-    nt_status
+    create_pdo(device.handle(), current)
 }
 
-/*DEFINE_GUID( GUID_DEVCLASS_KEYBOARD,            0x4d36e96bL, 0xe325, 0x11ce, 0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18 );*/
-static GUID_CLASS_KEYBOARD: GUID = GUID {
-    Data1: 0x4d36_e96bu64 as u32,
-    Data2: 0xe325,
-    Data3: 0x11ce,
-    Data4: [0xbf, 0xc1, 0x08, 0x00, 0x2b, 0xe1, 0x03, 0x18],
-};
 
-// the string is {A65C87F9-BE02-4ed9-92EC-012D416169FA}\\Interustception\0
-const RAW_DEVICE_ID: &[u8] =b"\xff\xfe{\x00A\x006\x005\x00C\x008\x007\x00F\x009\x00-\x00B\x00E\x000\x002\x00-\x004\x00e\x00d\x009\x00-\x009\x002\x00E\x00C\x00-\x000\x001\x002\x00D\x004\x001\x006\x001\x006\x009\x00F\x00A\x00}\x00\\\x00I\x00n\x00t\x00e\x00r\x00u\x00s\x00t\x00c\x00e\x00p\x00t\x00i\x00o\x00n\x00\x00\x00";
 
-const DEVICE_ID: UNICODE_STRING =
-    UNICODE_STRING {
-        Length: RAW_DEVICE_ID.len() as u16,
-        MaximumLength: RAW_DEVICE_ID.len() as u16,
-        Buffer: RAW_DEVICE_ID.as_ptr() as *mut _,
-    };
 
-fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
-    /*
-        NTSTATUS                    status;
-    PWDFDEVICE_INIT             pDeviceInit = NULL;
-    PRPDO_DEVICE_DATA           pdoData = NULL;
-    WDFDEVICE                   hChild = NULL;
-    WDF_OBJECT_ATTRIBUTES       pdoAttributes;
-    WDF_DEVICE_PNP_CAPABILITIES pnpCaps;
-    WDF_IO_QUEUE_CONFIG         ioQueueConfig;
-    WDFQUEUE                    queue;
-    WDF_DEVICE_STATE            deviceState;
-    PDEVICE_EXTENSION           devExt;
-    DECLARE_CONST_UNICODE_STRING(deviceId,KBFILTR_DEVICE_ID );
-    DECLARE_CONST_UNICODE_STRING(hardwareId,KBFILTR_DEVICE_ID );
-    DECLARE_CONST_UNICODE_STRING(deviceLocation,L"Keyboard Filter\0" );
-    DECLARE_UNICODE_STRING_SIZE(buffer, MAX_ID_LEN);
-     */
+const DEVICE_ID: NtUnicodeStr<'static> = nt_unicode_str!("{A65C87F9-BE02-4ed9-92EC-012D416169FA}\\Interustception\0");
+
+fn create_pdo(device: WDFDEVICE, current: u32) -> framework::Result<()> {
 
     println!("WAWAWA create_pdo called");
 
@@ -245,7 +98,7 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
             device_init,
             &GUID_CLASS_KEYBOARD,
         )
-    };
+    }
 
     if !nt_success(status) {
         println!("WAWAWA WdfPdoInitAssignRawDevice failed {status:#010X}");

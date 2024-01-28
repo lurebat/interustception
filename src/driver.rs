@@ -1,61 +1,27 @@
 // Copyright (c) Microsoft Corporation.
 // License: MIT OR Apache-2.0
-use wdk::{nt_success, paged_code, println};
-use wdk_sys::{macros, WDFDRIVER, *};
+use wdk::{paged_code, println};
+use wdk_sys::{WDFDRIVER, *};
 use wdk_sys::ntddk::KeGetCurrentIrql;
-use crate::{dbg, device, driver_entry};
+use crate::{dbg, device, DeviceContext, driver_entry, kernel_callback};
+use crate::framework::*;
 
 extern crate alloc;
 
 driver_entry!((driver, registry_path) {
-    dbg!();
+    DriverInit::new(driver)
+        .device_add(Some(device_add))
+        .create(registry_path)
+        .to_status()
+    });
 
-    let mut driver_config = WDF_DRIVER_CONFIG {
-        Size: core::mem::size_of::<WDF_DRIVER_CONFIG>() as ULONG,
-        EvtDriverDeviceAdd: Some(device_add),
-        ..WDF_DRIVER_CONFIG::default()
-    };
-    dbg!();
-    let mut driver_handle_output = WDF_NO_HANDLE as WDFDRIVER;
-
-    dbg!();
-    let nt_status = unsafe {
-        macros::call_unsafe_wdf_function_binding!(
-            WdfDriverCreate,
-            driver as PDRIVER_OBJECT,
-            registry_path,
-            WDF_NO_OBJECT_ATTRIBUTES,
-            &mut driver_config,
-            &mut driver_handle_output,
-        )
-    };
-    dbg!();
-
-    if !nt_success(nt_status) {
-        dbg!();
-        return nt_status;
+kernel_callback!(
+    fn device_add(_driver: WDFDRIVER, device_init: PWDFDEVICE_INIT) -> NTSTATUS {
+        unsafe { device::device_create(
+            unsafe { device_init.as_mut() }.expect("device_init is null"),
+        ) }.to_status()
     }
-
-    dbg!();
-
-    nt_status
-});
-
-#[link_section = "PAGE"]
-extern "C" fn device_add(_driver: WDFDRIVER, device_init: PWDFDEVICE_INIT) -> NTSTATUS {
-    paged_code!();
-
-    println!("Enter  EchoEvtDeviceAdd");
-
-    let device_init =
-        // SAFETY: WDF should always be providing a pointer that is properly aligned, dereferencable per https://doc.rust-lang.org/std/ptr/index.html#safety, and initialized. For the lifetime of the resulting reference, the pointed-to memory is never accessed through any other pointer.
-        unsafe {
-            device_init
-                .as_mut()
-                .expect("WDF should never provide a null pointer for device_init")
-        };
-    unsafe { device::echo_device_create(device_init) }
-}
+);
 
 //
 // kernel_callback!(fn device_add(_driver: WDFDRIVER, mut device_init: PWDFDEVICE_INIT) -> NTSTATUS {

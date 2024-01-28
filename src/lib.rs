@@ -49,13 +49,11 @@ use core::ptr::null_mut;
 use wdk_alloc::WDKAllocator;
 use wdk_sys::{*};
 
-mod wdf_object_context;
 mod foreign;
-mod utils;
 
-use wdf_object_context::{wdf_declare_context_type};
+mod framework;
+
 use crate::foreign::{ConnectData, KeyboardAttributes};
-use crate::wdf_object_context::wdf_declare_context_type_with_name;
 
 #[cfg(not(test))]
 #[global_allocator]

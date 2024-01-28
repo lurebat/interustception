@@ -11,8 +11,10 @@ wdk-alloc = {git = "https://github.com/microsoft/windows-drivers-rs.git", branch
 wdk-panic = {git = "https://github.com/microsoft/windows-drivers-rs.git", branch = "main"}
 wdk-sys = {git = "https://github.com/microsoft/windows-drivers-rs.git", branch = "main"}
 paste = "1.0.14"
-#bytemuck = "1.14.0"
-#num_enum = "0.7.1"
+bytemuck = { version = "1.14.0"}
+num_enum = {version = "0.7.2", default-features = false, features = []}
+snafu = {version = "0.8.0", default-features = false, features = []}
+nt-string = {version = "0.1.1", default-features = false, features = ["alloc"]}
 
 
 [build-dependencies]
