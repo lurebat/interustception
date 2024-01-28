@@ -39,7 +39,7 @@ interustception.sys = 1
 %MfgName% = Standard,NT$ARCH$
 
 [Standard.NT$ARCH$]
-%interustception.DeviceDesc% = interustception, *PNP0303
+%interustception.DeviceDesc% = interustception, *
 
 ;
 ; General installation section

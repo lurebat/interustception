@@ -563,6 +563,14 @@ fn create_pdo(device: WDFDEVICE, current: u32) -> NTSTATUS {
 
     println!("WAWAWA WdfDeviceCreateDeviceInterface called");
 
+    status = unsafe {
+        call_unsafe_wdf_function_binding!(
+            WdfFdoAddStaticChild,
+            device,
+            pdo,
+        )
+    };
+
     if !nt_success(status) {
         println!("WAWAWA WdfDeviceCreateDeviceInterface failed {status:#010X}");
         return status;
