@@ -5,7 +5,7 @@ use wdk_sys::_WDF_SYNCHRONIZATION_SCOPE::WdfSynchronizationScopeInheritFromParen
 use wdk_sys::_WDF_TRI_STATE::WdfUseDefault;
 use wdk_sys::macros::call_unsafe_wdf_function_binding;
 use crate::framework::{Context, Device, ErrorCode, NtStatusError, Result};
-use crate::init_object;
+use crate::{dbg, init_object};
 
 pub(crate) struct PdoBuilder {
     init: PWDFDEVICE_INIT,
@@ -60,24 +60,23 @@ impl PdoBuilder {
         self
     }
 
-    pub fn build_with_context<T: Context>(&mut self) -> crate::framework::Result<PdoDevice<T>> {
-        self.handle_class()?;
+    pub fn build_with_context<T: Context>(&mut self) -> Result<PdoDevice<T>> {
+        dbg!(self.handle_class()?);
 
-        self.handle_device_id()?;
+        dbg!(self.handle_device_id()?);
 
-        self.handle_instance_id()?;
+        dbg!(self.handle_instance_id()?);
 
-        self.handle_device_text()?;
+        dbg!(self.handle_device_text()?);
 
         if self.allow_forwarding_request_to_parent {
-            unsafe {
+            dbg!(unsafe {
                 call_unsafe_wdf_function_binding!(
-                    WdfPdoInitAllowForwardingRequestToParent,
-                    self.init,
-                )
-            }
+                WdfPdoInitAllowForwardingRequestToParent,
+                self.init,
+            )
+            });
         }
-
 
         let mut attrs = init_object!(WDF_OBJECT_ATTRIBUTES);
         attrs.ExecutionLevel = WdfExecutionLevelInheritFromParent;
@@ -85,13 +84,12 @@ impl PdoBuilder {
 
         let mut device_ptr = core::ptr::null_mut();
         let device = unsafe {
-            call_unsafe_wdf_function_binding!(
-                WdfDeviceCreate,
-                &mut (self.init as *mut WDFDEVICE_INIT) as *mut *mut WDFDEVICE_INIT,
-                (&mut attrs) as *mut WDF_OBJECT_ATTRIBUTES,
-                &mut device_ptr,
-            )
-        }.check_status(ErrorCode::DeviceCreationFailed).map(|_| {
+            dbg!(call_unsafe_wdf_function_binding!(
+            WdfDeviceCreate,
+            &mut (self.init as *mut WDFDEVICE_INIT) as *mut *mut WDFDEVICE_INIT,
+            (&mut attrs) as *mut WDF_OBJECT_ATTRIBUTES,
+            &mut device_ptr,
+        )) }.check_status(ErrorCode::DeviceCreationFailed).map(|_| {
             Device::<T>::new(unsafe { device_ptr.as_mut().expect("Device is null")})
         })?;
 
@@ -99,7 +97,6 @@ impl PdoBuilder {
 
         Ok(PdoDevice{device})
     }
-
     fn handle_device_text(&mut self) -> Result<()> {
         if let Some((device_description, device_location, locale)) = &self.device_text {
             unsafe {

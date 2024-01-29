@@ -30,11 +30,16 @@ static mut INSTANCES: AtomicU32 = AtomicU32::new(0);
 
 
 pub(crate) fn device_create(device_init: &mut WDFDEVICE_INIT) -> framework::Result<()> {
+
+    dbg!("device_create");
+
     let mut builder = DeviceBuilder::new(device_init);
     let mut device = builder
         .as_filter_device()
         .with_device_type(FILE_DEVICE_KEYBOARD)
         .build_with_context::<DeviceContext>()?;
+
+    dbg!("device_create - created device");
 
     let _default_queue = QueueBuilder::new()
         .default_queue()
@@ -42,11 +47,15 @@ pub(crate) fn device_create(device_init: &mut WDFDEVICE_INIT) -> framework::Resu
         .internal_device_control(Some(internal_ioctl))
         .create(device.handle())?;
 
+    dbg!("device_create - created default queue");
+
     let pdo_queue = QueueBuilder::new()
         .default_queue()
         .parallel_dispatch()
         .internal_device_control(Some(pdo_from_ioctl))
         .create(device.handle())?;
+
+    dbg!("device_create - created pdo queue");
 
     let context = device.context_mut();
     context.raw_pdo_queue = pdo_queue.handle();
@@ -55,7 +64,11 @@ pub(crate) fn device_create(device_init: &mut WDFDEVICE_INIT) -> framework::Resu
         INSTANCES.fetch_add(1, core::sync::atomic::Ordering::SeqCst)
     } + 1;
 
+    dbg!("device_create - starting to create pdos");
+
     create_pdo(&mut device, current)?;
+
+    dbg!("device_create - created pdos");
 
     device.save();
 
@@ -69,9 +82,13 @@ const DEVICE_LOCATION: NtUnicodeStr<'static> = nt_unicode_str!("Interustception"
 
 fn create_pdo(device: &mut Device<DeviceContext>, current: u32) -> framework::Result<()> {
 
+    dbg!("create_pdo");
+
     let instance_id = NtUnicodeString::try_from(format!("{:02}", current)).unwrap();
 
     let device_description = NtUnicodeString::try_from(format!("Interustception PDO {:02}", current)).unwrap();
+
+    dbg!("create_pdo - starting to create pdo");
 
     let mut builder = PdoBuilder::new(device.handle());
     let mut pdo = builder
@@ -82,14 +99,20 @@ fn create_pdo(device: &mut Device<DeviceContext>, current: u32) -> framework::Re
         .allow_forwarding_request_to_parent()
         .build_with_context::<PdoContext>()?;
 
+    dbg!("create_pdo - created pdo");
+
     pdo.context_mut().instance = current;
     pdo.context_mut().queue = device.context().raw_pdo_queue;
 
 
-    let pdo_queue = QueueBuilder::new()
+    dbg!("create_pdo - starting to create pdo queue");
+
+    let _pdo_queue = QueueBuilder::new()
         .default_queue()
         .internal_device_control(Some(pdo_to_ioctl))
         .create(pdo.handle())?;
+
+    dbg!("create_pdo - created pdo queue");
 
     pdo.set_capabilities(
         true,
@@ -100,7 +123,10 @@ fn create_pdo(device: &mut Device<DeviceContext>, current: u32) -> framework::Re
 
     pdo.create_interface(&GUID_DEVINTERFACE_INTERUSTCEPTION)?;
 
+    dbg!("create_pdo - created interface");
     pdo.attach(device.handle())?;
+
+    dbg!("create_pdo - attached pdo");
 
     pdo.save();
 
