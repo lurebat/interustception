@@ -50,7 +50,6 @@ pub(crate) fn device_create(device_init: &mut WDFDEVICE_INIT) -> framework::Resu
     dbg!("device_create - created default queue");
 
     let pdo_queue = QueueBuilder::new()
-        .default_queue()
         .parallel_dispatch()
         .internal_device_control(Some(pdo_from_ioctl))
         .create(device.handle())?;
