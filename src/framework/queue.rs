@@ -28,7 +28,7 @@ impl QueueBuilder {
         self
     }
 
-    pub fn device_io_control(&mut self, callback: PFN_WDF_IO_QUEUE_IO_DEVICE_CONTROL) -> &mut Self {
+    pub fn device_control(&mut self, callback: PFN_WDF_IO_QUEUE_IO_DEVICE_CONTROL) -> &mut Self {
         self.config.EvtIoDeviceControl = callback;
         self
     }
