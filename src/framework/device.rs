@@ -1,3 +1,4 @@
+use core::mem;
 use wdk_sys::{FILE_DEVICE_KEYBOARD, NT_SUCCESS, NTSTATUS, WDF_OBJECT_ATTRIBUTES, WDFDEVICE, WDFDEVICE__, WDFDEVICE_INIT, WDFOBJECT};
 use wdk_sys::_WDF_EXECUTION_LEVEL::WdfExecutionLevelInheritFromParent;
 use wdk_sys::_WDF_SYNCHRONIZATION_SCOPE::WdfSynchronizationScopeInheritFromParent;
@@ -94,15 +95,28 @@ impl<'a, T: Context> Device<'a, T> {
         }.expect("Context is null")
     }
 
-    pub fn handle(&self) -> WDFDEVICE {
+    pub fn handle(&mut self) -> WDFDEVICE {
         unsafe {
             self.device as WDFDEVICE
         }
     }
 
     pub fn save(self) -> WDFDEVICE {
+        let device = self.device as WDFDEVICE;
+
+        mem::forget(self);
+
+        device
+    }
+}
+
+impl<'a, T: Context> Drop for Device<'a, T> {
+    fn drop(&mut self) {
         unsafe {
-            self.device
+            call_unsafe_wdf_function_binding!(
+                WdfObjectDelete,
+                self.device as *mut _ as WDFOBJECT
+            )
         }
     }
 }

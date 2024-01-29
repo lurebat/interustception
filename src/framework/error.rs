@@ -11,6 +11,11 @@ pub enum ErrorCode {
     QueueCreationFailed,
     PdoInitAssignRawDeviceFailed,
     PdoInitAssignDeviceIdFailed,
+    PdoInitAssignInstanceIdFailed,
+    PdoInitAddDeviceTextFailed,
+    DeviceDeletionFailed,
+    DeviceCreateDeviceInterfaceFailed,
+    FdoAddStaticChildFailed,
 }
 
 #[derive(Snafu, Debug)]

@@ -1,9 +1,12 @@
 // Copyright (c) Microsoft Corporation.
 // License: MIT OR Apache-2.0
 
+use alloc::format;
+use core::fmt::Debug;
 use core::sync::atomic::AtomicU32;
 use nt_string::nt_unicode_str;
-use nt_string::unicode_string::NtUnicodeStr;
+use nt_string::unicode_string::{NtUnicodeStr, NtUnicodeString, NtUnicodeStrMut};
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 use wdk::{nt_success, paged_code, println};
 use wdk_sys::{*};
 use wdk_sys::_WDF_REQUEST_SEND_OPTIONS_FLAGS::WDF_REQUEST_SEND_OPTION_SEND_AND_FORGET;
@@ -18,22 +21,22 @@ use crate::{
     *,
 };
 use crate::device::KeyboardIoctl::PdoKeyboardAttributes;
-use crate::foreign::{ConnectData, KeyboardAttributes, KeyboardInputData};
-use crate::framework::{DeviceBuilder, QueueBuilder};
+use crate::foreign::{ConnectData, GUID_CLASS_KEYBOARD, KeyboardAttributes, KeyboardInputData};
+use crate::framework::{Device, DeviceBuilder, QueueBuilder};
+use crate::framework::pdo::PdoBuilder;
 
 static mut INSTANCES: AtomicU32 = AtomicU32::new(0);
 
 
 
-pub(crate) fn device_create(device_init: &mut WDFDEVICE_INIT) -> framework::Result<> {
-    let mut device = DeviceBuilder::new(device_init)
+pub(crate) fn device_create(device_init: &mut WDFDEVICE_INIT) -> framework::Result<()> {
+    let mut builder = DeviceBuilder::new(device_init);
+    let mut device = builder
         .as_filter_device()
         .with_device_type(FILE_DEVICE_KEYBOARD)
         .build_with_context::<DeviceContext>()?;
 
-    let context = device.context_mut();
-
-    QueueBuilder::new()
+    let _default_queue = QueueBuilder::new()
         .default_queue()
         .parallel_dispatch()
         .internal_device_control(Some(internal_ioctl))
@@ -45,400 +48,70 @@ pub(crate) fn device_create(device_init: &mut WDFDEVICE_INIT) -> framework::Resu
         .internal_device_control(Some(pdo_from_ioctl))
         .create(device.handle())?;
 
+    let context = device.context_mut();
     context.raw_pdo_queue = pdo_queue.handle();
 
     let current = unsafe {
         INSTANCES.fetch_add(1, core::sync::atomic::Ordering::SeqCst)
     } + 1;
 
-    create_pdo(device.handle(), current)
+    create_pdo(&mut device, current)?;
+
+    device.save();
+
+    Ok(())
+
 }
 
+const DEVICE_ID: NtUnicodeStr<'static> = nt_unicode_str!("{A65C87F9-BE02-4ed9-92EC-012D416169FA}\\Interustception");
 
+const DEVICE_LOCATION: NtUnicodeStr<'static> = nt_unicode_str!("Interustception");
 
+fn create_pdo(device: &mut Device<DeviceContext>, current: u32) -> framework::Result<()> {
 
-const DEVICE_ID: NtUnicodeStr<'static> = nt_unicode_str!("{A65C87F9-BE02-4ed9-92EC-012D416169FA}\\Interustception\0");
+    let instance_id = NtUnicodeString::try_from(format!("{:02}", current)).unwrap();
 
-fn create_pdo(device: WDFDEVICE, current: u32) -> framework::Result<()> {
+    let device_description = NtUnicodeString::try_from(format!("Interustception PDO {:02}", current)).unwrap();
 
-    println!("WAWAWA create_pdo called");
+    let mut builder = PdoBuilder::new(device.handle());
+    let mut pdo = builder
+        .with_class(GUID_CLASS_KEYBOARD)
+        .with_device_id(DEVICE_ID)
+        .with_instance_id(instance_id)
+        .with_device_text(device_description, DEVICE_LOCATION, 0x409)
+        .allow_forwarding_request_to_parent()
+        .build_with_context::<PdoContext>()?;
 
-    let mut device_init = unsafe {
-        call_unsafe_wdf_function_binding!(
-            WdfPdoInitAllocate,
-            device,
-        )
-    };
+    pdo.context_mut().instance = current;
+    pdo.context_mut().queue = device.context().raw_pdo_queue;
 
-    if device_init.is_null() {
-        println!("WAWAWA WdfPdoInitAllocate failed");
-        return STATUS_INSUFFICIENT_RESOURCES;
-    }
 
-    /*
-     //
-    // Mark the device RAW so that the child device can be started
-    // and accessed without requiring a function driver. Since we are
-    // creating a RAW PDO, we must provide a class guid.
-    //
-    status = WdfPdoInitAssignRawDevice(pDeviceInit, &GUID_DEVCLASS_KEYBOARD);
-    if (!NT_SUCCESS(status)) {
-        goto Cleanup;
-    }
-     */
+    let pdo_queue = QueueBuilder::new()
+        .default_queue()
+        .internal_device_control(Some(pdo_to_ioctl))
+        .create(pdo.handle())?;
 
-    // 4D36E96B-E325-11CE-BFC1-08002BE10318
+    pdo.set_capabilities(
+        true,
+        true,
+        current,
+        current
+    );
 
-    println!("WAWAWA WdfPdoInitAssignRawDevice called");
+    pdo.create_interface(&GUID_DEVINTERFACE_INTERUSTCEPTION)?;
 
+    pdo.attach(device.handle())?;
 
-    let mut status = unsafe {
-        call_unsafe_wdf_function_binding!(
-            WdfPdoInitAssignRawDevice,
-            device_init,
-            &GUID_CLASS_KEYBOARD,
-        )
-    }
+    pdo.save();
 
-    if !nt_success(status) {
-        println!("WAWAWA WdfPdoInitAssignRawDevice failed {status:#010X}");
-        return status;
-    }
-
-    /*
-        //
-    // Assign DeviceID - This will be reported to IRP_MN_QUERY_ID/BusQueryDeviceID
-    //
-    status = WdfPdoInitAssignDeviceID(pDeviceInit, &deviceId);
-    if (!NT_SUCCESS(status)) {
-        goto Cleanup;
-    }
-     */
-
-    println!("WAWAWA WdfPdoInitAssignRawDevice called");
-
-    status = unsafe {
-        call_unsafe_wdf_function_binding!(
-            WdfPdoInitAssignDeviceID,
-            device_init,
-            &DEVICE_ID,
-        ) };
-
-    if !nt_success(status) {
-        println!("WAWAWA WdfPdoInitAssignDeviceID failed {status:#010X}");
-        return status;
-    }
-
-    let mut buffer_bytes = [0u16; 128];
-    let mut buffer = UNICODE_STRING {
-        Length: 0,
-        MaximumLength: 128,
-        Buffer: buffer_bytes.as_mut_ptr(),
-    };
-
-    println!("WAWAWA WdfPdoInitAssignDeviceID called");
-
-    /*
-        //
-    // We could be enumerating more than one children if the filter attaches
-    // to multiple instances of keyboard, so we must provide a
-    // BusQueryInstanceID. If we don't, system will throw CA bugcheck.
-    */
-
-    // buffer_bytes - put in the instance number
-    let current_first_digit = current / 10;
-    let current_second_digit = current % 10;
-    buffer_bytes[0] = '0' as u16 + current_first_digit as u16;
-    buffer_bytes[1] = '0' as u16 + current_second_digit as u16;
-    buffer.Length = 2u16 * core::mem::size_of::<u16>() as u16;
-
-    status = unsafe {
-        call_unsafe_wdf_function_binding!(
-            WdfPdoInitAssignInstanceID,
-            device_init,
-            &buffer,
-        )
-    };
-
-    if !nt_success(status) {
-        println!("WAWAWA WdfPdoInitAssignInstanceID failed {status:#010X}");
-        return status;
-    }
-
-    /*
-     //
-    // Provide a description about the device. This text is usually read from
-    // the device. In the case of USB device, this text comes from the string
-    // descriptor. This text is displayed momentarily by the PnP manager while
-    // it's looking for a matching INF. If it finds one, it uses the Device
-    // Description from the INF file to display in the device manager.
-    // Since our device is raw device and we don't provide any hardware ID
-    // to match with an INF, this text will be displayed in the device manager.
-    //
-    status = RtlUnicodeStringPrintf(&buffer,L"Keyboard_Filter_%02d", InstanceNo );
-    if (!NT_SUCCESS(status)) {
-        goto Cleanup;
-    }
-     */
-    buffer_bytes[0] = 'K' as u16;
-    buffer_bytes[1] = 'e' as u16;
-    buffer_bytes[2] = 'y' as u16;
-    buffer_bytes[3] = 'b' as u16;
-    buffer_bytes[4] = 'o' as u16;
-    buffer_bytes[5] = 'a' as u16;
-    buffer_bytes[6] = 'r' as u16;
-    buffer_bytes[7] = 'd' as u16;
-    buffer_bytes[8] = '_' as u16;
-    buffer_bytes[9] = 'F' as u16;
-    buffer_bytes[10] = 'i' as u16;
-    buffer_bytes[11] = 'l' as u16;
-    buffer_bytes[12] = 't' as u16;
-    buffer_bytes[13] = 'e' as u16;
-
-    buffer_bytes[14] = 'r' as u16;
-    buffer_bytes[15] = '_' as u16;
-    buffer_bytes[16] = '0' as u16 + current_first_digit as u16;
-    buffer_bytes[17] = '0' as u16 + current_second_digit as u16;
-    buffer_bytes[18] = 0;
-    buffer.Length = 18u16 * core::mem::size_of::<u16>() as u16;
-
-    /*
-        //
-    // You can call WdfPdoInitAddDeviceText multiple times, adding device
-    // text for multiple locales. When the system displays the text, it
-    // chooses the text that matches the current locale, if available.
-    // Otherwise it will use the string for the default locale.
-    // The driver can specify the driver's default locale by calling
-    // WdfPdoInitSetDefaultLocale.
-    //
-    status = WdfPdoInitAddDeviceText(pDeviceInit,
-                                        &buffer,
-                                        &deviceLocation,
-                                        0x409
-                                        );
-    if (!NT_SUCCESS(status)) {
-        goto Cleanup;
-    }
-
-    WdfPdoInitSetDefaultLocale(pDeviceInit, 0x409);
-     */
-
-    println!("WAWAWA add text");
-
-    status = unsafe { call_unsafe_wdf_function_binding!(
-        WdfPdoInitAddDeviceText,
-        device_init,
-        &buffer,
-        &DEVICE_ID,
-        0x409,
-    ) };
-
-    if !nt_success(status) {
-        println!("WAWAWA WdfPdoInitAddDeviceText failed {status:#010X}");
-        return status;
-    }
-
-    println!("WAWAWA set default locale");
-
-    unsafe { call_unsafe_wdf_function_binding!(
-        WdfPdoInitSetDefaultLocale,
-        device_init,
-        0x409,
-    ) };
-
-
-
-    let mut attributes = WDF_OBJECT_ATTRIBUTES {
-        Size: core::mem::size_of::<WDF_OBJECT_ATTRIBUTES>() as ULONG,
-        ExecutionLevel: _WDF_EXECUTION_LEVEL::WdfExecutionLevelInheritFromParent,
-        SynchronizationScope: _WDF_SYNCHRONIZATION_SCOPE::WdfSynchronizationScopeInheritFromParent,
-        ..WDF_OBJECT_ATTRIBUTES::default()
-    };
-
-
-    attributes.ContextTypeInfo = wdf_get_context_type_info!(PdoContext);
-
-    /*
-        //
-    // Set up our queue to allow forwarding of requests to the parent
-    // This is done so that the cached Keyboard Attributes can be retrieved
-    //
-    WdfPdoInitAllowForwardingRequestToParent(pDeviceInit);
-
-        status = WdfDeviceCreate(&pDeviceInit, &pdoAttributes, &hChild);
-    if (!NT_SUCCESS(status)) {
-        goto Cleanup;
-    }
-     */
-
-    println!("WAWAWA WdfPdoInitAllowForwardingRequestToParent");
-
-    unsafe {
-        call_unsafe_wdf_function_binding!(
-        WdfPdoInitAllowForwardingRequestToParent,
-        device_init,    )
-    };
-
-    println!("WAWAWA WdfDeviceCreate");
-
-    let mut pdo = WDF_NO_HANDLE as WDFDEVICE;
-    status = unsafe {
-        call_unsafe_wdf_function_binding!(
-            WdfDeviceCreate,
-            &mut device_init,
-            &mut attributes,
-            &mut pdo,
-        )
-    };
-
-    println!("WAWAWA WdfDeviceCreate called");
-
-    if !nt_success(status) {
-        println!("WAWAWA WdfDeviceCreate failed {status:#010X}");
-        return status;
-    }
-
-    let pdo_context = unsafe { get_pdo_context(pdo as WDFOBJECT) };
-    unsafe { (*pdo_context).instance = current };
-
-    let device_context = unsafe { wdf_object_get_device_context(device as WDFOBJECT) };
-    unsafe { (*pdo_context).queue = (*device_context).raw_pdo_queue };
-
-    println!("WAWAWA WdfDeviceCreate succeeded");
-
-    /*
-     //
-    // Configure the default queue associated with the control device object
-    // to be Serial so that request passed to EvtIoDeviceControl are serialized.
-    // A default queue gets all the requests that are not
-    // configure-fowarded using WdfDeviceConfigureRequestDispatching.
-    //
-
-    WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&ioQueueConfig,
-                                    WdfIoQueueDispatchSequential);
-
-    ioQueueConfig.EvtIoDeviceControl = KbFilter_EvtIoDeviceControlForRawPdo;
-
-    status = WdfIoQueueCreate(hChild,
-                                        &ioQueueConfig,
-                                        WDF_NO_OBJECT_ATTRIBUTES,
-                                        &queue // pointer to default queue
-                                        );
-    if (!NT_SUCCESS(status)) {
-        DebugPrint( ("WdfIoQueueCreate failed 0x%x\n", status));
-        goto Cleanup;
-    }
-
-     */
-
-    println!("WAWAWA WdfDeviceCreate succeeded");
-
-    let mut queue_config = WDF_IO_QUEUE_CONFIG {
-        Size: core::mem::size_of::<WDF_IO_QUEUE_CONFIG>() as ULONG,
-        PowerManaged: _WDF_TRI_STATE::WdfUseDefault,
-        DefaultQueue: true as u8,
-        DispatchType: _WDF_IO_QUEUE_DISPATCH_TYPE::WdfIoQueueDispatchSequential,
-        EvtIoInternalDeviceControl: Some(pdo_to_ioctl),
-        ..WDF_IO_QUEUE_CONFIG::default()
-    };
-
-    println!("WAWAWA WDF_IO_QUEUE_CONFIG initialized");
-
-    let mut queue : WDFQUEUE = null_mut() as WDFQUEUE;
-
-    status = unsafe {
-        call_unsafe_wdf_function_binding!(
-            WdfIoQueueCreate,
-            pdo,
-            &mut queue_config,
-            WDF_NO_OBJECT_ATTRIBUTES,
-            &mut queue,
-        )
-    };
-
-    println!("WAWAWA WdfIoQueueCreate called");
-
-    if !nt_success(status) {
-        println!("WAWAWA WdfIoQueueCreate failed {status:#010X}");
-        return status;
-    }
-
-    let mut caps = WDF_DEVICE_PNP_CAPABILITIES {
-        Size: core::mem::size_of::<WDF_DEVICE_PNP_CAPABILITIES>() as ULONG,
-        LockSupported: WdfUseDefault,
-        EjectSupported: WdfUseDefault,
-        Removable: WdfTrue,
-        DockDevice: WdfUseDefault,
-        UniqueID: WdfUseDefault,
-        SilentInstall: WdfUseDefault,
-        SurpriseRemovalOK: WdfTrue,
-        HardwareDisabled: WdfUseDefault,
-        NoDisplayInUI: WdfUseDefault,
-        Address: current,
-        UINumber: current,
-    };
-
-    unsafe {
-        call_unsafe_wdf_function_binding!(
-            WdfDeviceSetPnpCapabilities,
-            pdo,
-            &mut caps,
-        )
-    };
-
-    println!("WAWAWA WdfDeviceSetPnpCapabilities called");
-
-    /*
-     //
-    // Tell the Framework that this device will need an interface so that
-    // application can find our device and talk to it.
-    //
-    status = WdfDeviceCreateDeviceInterface(
-                 hChild,
-                 &GUID_DEVINTERFACE_KBFILTER,
-                 NULL
-             );
-
-    if (!NT_SUCCESS (status)) {
-        DebugPrint( ("WdfDeviceCreateDeviceInterface failed 0x%x\n", status));
-        goto Cleanup;
-    }
-     */
-
-    status = unsafe {
-        call_unsafe_wdf_function_binding!(
-            WdfDeviceCreateDeviceInterface,
-            pdo,
-            &GUID_DEVINTERFACE_INTERUSTCEPTION,
-            core::ptr::null_mut(),
-        )
-    };
-
-    println!("WAWAWA WdfDeviceCreateDeviceInterface called");
-
-    status = unsafe {
-        call_unsafe_wdf_function_binding!(
-            WdfFdoAddStaticChild,
-            device,
-            pdo,
-        )
-    };
-
-    if !nt_success(status) {
-        println!("WAWAWA WdfDeviceCreateDeviceInterface failed {status:#010X}");
-        return status;
-    }
-
-    status
-
-    // todo - cleanup
+    Ok(())
 }
 
 const fn ctl_code(device_type: u32, function: u32, method: u32, access: u32) -> u32 {
     (device_type << 16) | (access << 14) | (function << 2) | method
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, IntoPrimitive, TryFromPrimitive)]
 #[repr(u32)]
 enum KeyboardIoctl {
     SetPrecedence = ctl_code(FILE_DEVICE_UNKNOWN, 0x801, METHOD_BUFFERED, FILE_ANY_ACCESS),
@@ -455,39 +128,6 @@ enum KeyboardIoctl {
     KeyboardQueryAttributes = 720896u32,
 
     PdoKeyboardAttributes = ctl_code(FILE_DEVICE_KEYBOARD, 0x800, METHOD_BUFFERED, FILE_READ_DATA),
-}
-
-impl KeyboardIoctl {
-    const fn try_from(value: u32) -> Result<Self, u32> {
-        use KeyboardIoctl::*;
-        if value == SetPrecedence as u32 {
-            Ok(SetPrecedence)
-        } else if value == GetPrecedence as u32 {
-            Ok(GetPrecedence)
-        } else if value == SetFiler as u32 {
-            Ok(SetFiler)
-        } else if value == GetFilter as u32 {
-            Ok(GetFilter)
-        } else if value == SetEvent as u32 {
-            Ok(SetEvent)
-        } else if value == Write as u32 {
-            Ok(Write)
-        } else if value == Read as u32 {
-            Ok(Read)
-        } else if value == GetHardwareId as u32 {
-            Ok(GetHardwareId)
-        } else if value == KeyboardConnect as u32 {
-            Ok(KeyboardConnect)
-        } else if value == KeyboardDisconnect as u32 {
-            Ok(KeyboardDisconnect)
-        } else if value == KeyboardQueryAttributes as u32 {
-            Ok(KeyboardQueryAttributes)
-        } else if value == PdoKeyboardAttributes as u32 {
-            Ok(PdoKeyboardAttributes)
-        } else {
-            Err(value)
-        }
-    }
 }
 
 

@@ -39,7 +39,7 @@ impl QueueBuilder {
         self
     }
 
-    pub fn create<T>(&mut self, device: WDFDEVICE) -> Result<Queue> {
+    pub fn create(&mut self, device: WDFDEVICE) -> Result<Queue> {
         let mut queue_handle = null_mut() as WDFQUEUE;
         unsafe {
             call_unsafe_wdf_function_binding!(
