@@ -1,7 +1,7 @@
 use core::ptr::null_mut;
 use wdk_sys::_WDF_IO_QUEUE_DISPATCH_TYPE::{WdfIoQueueDispatchParallel, WdfIoQueueDispatchSequential};
 use wdk_sys::_WDF_TRI_STATE::WdfUseDefault;
-use wdk_sys::{BOOLEAN, PFN_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL, ULONG, WDF_IO_QUEUE_CONFIG, WDF_NO_HANDLE, WDF_NO_OBJECT_ATTRIBUTES, WDFDEVICE, WDFQUEUE};
+use wdk_sys::{BOOLEAN, PFN_WDF_IO_QUEUE_IO_DEVICE_CONTROL, PFN_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL, ULONG, WDF_IO_QUEUE_CONFIG, WDF_NO_OBJECT_ATTRIBUTES, WDFDEVICE, WDFQUEUE};
 use wdk_sys::macros::call_unsafe_wdf_function_binding;
 use crate::framework::{Result, ErrorCode, NtStatusError};
 use crate::init_object;
@@ -25,6 +25,11 @@ impl QueueBuilder {
 
     pub fn internal_device_control(&mut self, callback: PFN_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL) -> &mut Self {
         self.config.EvtIoInternalDeviceControl = callback;
+        self
+    }
+
+    pub fn device_io_control(&mut self, callback: PFN_WDF_IO_QUEUE_IO_DEVICE_CONTROL) -> &mut Self {
+        self.config.EvtIoDeviceControl = callback;
         self
     }
 

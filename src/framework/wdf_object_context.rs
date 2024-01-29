@@ -81,8 +81,6 @@ macro_rules! wdf_declare_context_type {
     };
 }
 
-pub(crate) use wdf_declare_context_type;
-
 pub(crate) trait Context {
     fn get_context_type_info() -> PCWDF_OBJECT_CONTEXT_TYPE_INFO;
 

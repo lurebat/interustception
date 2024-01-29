@@ -10,5 +10,4 @@ pub use queue::*;
 pub use driver::*;
 pub use device::*;
 pub use error::*;
-pub use utils::*;
 pub use wdf_object_context::*;

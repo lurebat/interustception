@@ -13,7 +13,6 @@ pub enum ErrorCode {
     PdoInitAssignDeviceIdFailed,
     PdoInitAssignInstanceIdFailed,
     PdoInitAddDeviceTextFailed,
-    DeviceDeletionFailed,
     DeviceCreateDeviceInterfaceFailed,
     FdoAddStaticChildFailed,
 }

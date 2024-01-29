@@ -1,5 +1,5 @@
 use nt_string::unicode_string::{NtUnicodeStr, NtUnicodeString};
-use wdk_sys::{GUID, PWDFDEVICE_INIT, UNICODE_STRING, WDF_DEVICE_PNP_CAPABILITIES, WDF_OBJECT_ATTRIBUTES, WDFDEVICE, WDFDEVICE__, WDFDEVICE_INIT};
+use wdk_sys::{GUID, PWDFDEVICE_INIT, UNICODE_STRING, WDF_DEVICE_PNP_CAPABILITIES, WDF_OBJECT_ATTRIBUTES, WDFDEVICE, WDFDEVICE_INIT};
 use wdk_sys::_WDF_EXECUTION_LEVEL::WdfExecutionLevelInheritFromParent;
 use wdk_sys::_WDF_SYNCHRONIZATION_SCOPE::WdfSynchronizationScopeInheritFromParent;
 use wdk_sys::_WDF_TRI_STATE::WdfUseDefault;
@@ -13,7 +13,6 @@ pub(crate) struct PdoBuilder {
     device_id: Option<NtUnicodeStr<'static>>,
     instance_id: Option<NtUnicodeString>,
     device_text: Option<(NtUnicodeString, NtUnicodeStr<'static>, u32)>,
-    locale: Option<u32>,
     allow_forwarding_request_to_parent: bool,
 }
 
@@ -30,7 +29,6 @@ impl PdoBuilder {
             device_id: None,
             instance_id: None,
             device_text: None,
-            locale: None,
             allow_forwarding_request_to_parent: false,
         }
     }
@@ -81,6 +79,7 @@ impl PdoBuilder {
         let mut attrs = init_object!(WDF_OBJECT_ATTRIBUTES);
         attrs.ExecutionLevel = WdfExecutionLevelInheritFromParent;
         attrs.SynchronizationScope = WdfSynchronizationScopeInheritFromParent;
+        attrs.ContextTypeInfo = T::get_context_type_info();
 
         let mut device_ptr = core::ptr::null_mut();
         let device = unsafe {
@@ -163,15 +162,16 @@ impl PdoBuilder {
 impl Drop for PdoBuilder {
     fn drop(&mut self) {
         if self.init.is_null() {
+            dbg!("Not dropping builder");
             return;
         }
 
-        unsafe {
+        dbg!(unsafe {
             call_unsafe_wdf_function_binding!(
                 WdfDeviceInitFree,
                 self.init as *mut WDFDEVICE_INIT
             );
-        }
+        })
     }
 }
 

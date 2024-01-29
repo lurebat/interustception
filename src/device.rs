@@ -5,31 +5,27 @@ use alloc::format;
 use core::fmt::Debug;
 use core::sync::atomic::AtomicU32;
 use nt_string::nt_unicode_str;
-use nt_string::unicode_string::{NtUnicodeStr, NtUnicodeString, NtUnicodeStrMut};
+use nt_string::unicode_string::{NtUnicodeStr, NtUnicodeString};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use wdk::{nt_success, paged_code, println};
 use wdk_sys::{*};
 use wdk_sys::_WDF_REQUEST_SEND_OPTIONS_FLAGS::WDF_REQUEST_SEND_OPTION_SEND_AND_FORGET;
 use wdk_sys::_WDF_REQUEST_TYPE::WdfRequestTypeDeviceControlInternal;
-use wdk_sys::_WDF_TRI_STATE::{WdfTrue, WdfUseDefault};
 use wdk_sys::macros::call_unsafe_wdf_function_binding;
 use wdk_sys::ntddk::KeGetCurrentIrql;
 
-use crate::{
-    framework::wdf_object_context::*,
-    DeviceContext,
-    *,
-};
+use crate::{dbg, DeviceContext, get_pdo_context, GUID_DEVINTERFACE_INTERUSTCEPTION, PdoContext, wdf_object_get_device_context};
 use crate::device::KeyboardIoctl::PdoKeyboardAttributes;
 use crate::foreign::{ConnectData, GUID_CLASS_KEYBOARD, KeyboardAttributes, KeyboardInputData};
-use crate::framework::{Device, DeviceBuilder, QueueBuilder};
+use crate::framework::{Device, DeviceBuilder, QueueBuilder, Result};
 use crate::framework::pdo::PdoBuilder;
+use crate::framework::utils::ctl_code;
 
 static mut INSTANCES: AtomicU32 = AtomicU32::new(0);
 
 
 
-pub(crate) fn device_create(device_init: &mut WDFDEVICE_INIT) -> framework::Result<()> {
+pub(crate) fn device_create(device_init: &mut WDFDEVICE_INIT) -> Result<()> {
 
     dbg!("device_create");
 
@@ -69,7 +65,7 @@ pub(crate) fn device_create(device_init: &mut WDFDEVICE_INIT) -> framework::Resu
 
     dbg!("device_create - created pdos");
 
-    device.save();
+    dbg!(device.save());
 
     Ok(())
 
@@ -79,7 +75,7 @@ const DEVICE_ID: NtUnicodeStr<'static> = nt_unicode_str!("{A65C87F9-BE02-4ed9-92
 
 const DEVICE_LOCATION: NtUnicodeStr<'static> = nt_unicode_str!("Interustception");
 
-fn create_pdo(device: &mut Device<DeviceContext>, current: u32) -> framework::Result<()> {
+fn create_pdo(device: &mut Device<DeviceContext>, current: u32) -> Result<()> {
 
     dbg!("create_pdo");
 
@@ -100,15 +96,18 @@ fn create_pdo(device: &mut Device<DeviceContext>, current: u32) -> framework::Re
 
     dbg!("create_pdo - created pdo");
 
-    pdo.context_mut().instance = current;
-    pdo.context_mut().queue = device.context().raw_pdo_queue;
+    {
+        let context = dbg!(pdo.context_mut());
+        context.instance = current;
+        context.queue = device.context().raw_pdo_queue;
+    }
 
 
     dbg!("create_pdo - starting to create pdo queue");
 
     let _pdo_queue = QueueBuilder::new()
         .default_queue()
-        .internal_device_control(Some(pdo_to_ioctl))
+        .device_control(Some(pdo_to_ioctl))
         .create(pdo.handle())?;
 
     dbg!("create_pdo - created pdo queue");
@@ -130,10 +129,6 @@ fn create_pdo(device: &mut Device<DeviceContext>, current: u32) -> framework::Re
     pdo.save();
 
     Ok(())
-}
-
-const fn ctl_code(device_type: u32, function: u32, method: u32, access: u32) -> u32 {
-    (device_type << 16) | (access << 14) | (function << 2) | method
 }
 
 #[derive(Debug, Eq, PartialEq, IntoPrimitive, TryFromPrimitive)]
@@ -250,7 +245,7 @@ unsafe extern "C" fn internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _outpu
 
     if forward_request {
         println!("WAWA internal_ioctl 7.1");
-        let mut output_memory = null_mut() as WDFMEMORY;
+        let mut output_memory = core::ptr::null_mut() as WDFMEMORY;
 
         status = unsafe {
             call_unsafe_wdf_function_binding!(
@@ -401,7 +396,7 @@ extern "C" fn pdo_from_ioctl(queue: WDFQUEUE, request: WDFREQUEST, output_buffer
             status = STATUS_BUFFER_TOO_SMALL;
         }
         else {
-            let mut output_memory = null_mut() as WDFMEMORY;
+            let mut output_memory = core::ptr::null_mut() as WDFMEMORY;
             status = unsafe {
                 call_unsafe_wdf_function_binding!(
                     WdfRequestRetrieveOutputMemory,
@@ -528,7 +523,7 @@ unsafe extern "C" fn service_callback(device_object: PDEVICE_OBJECT, input_data_
     if input_data_length > 0 {
         let input_data_slice = unsafe { core::slice::from_raw_parts(input_data_start, input_data_length) };
         for (i, input_data) in input_data_slice.iter().enumerate() {
-            dbg!(input_data);
+            dbg!((i, input_data));
         }
     }
 

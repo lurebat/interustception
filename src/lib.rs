@@ -80,6 +80,7 @@ impl Default for ConnectData {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 pub struct DeviceContext {
     raw_pdo_queue: WDFQUEUE,
     upper_connect_data: ConnectData,
@@ -88,6 +89,8 @@ pub struct DeviceContext {
 }
 wdf_declare_context_type!(DeviceContext);
 
+
+#[derive(Debug, Copy, Clone)]
 pub struct PdoContext {
     instance: u32,
     queue: WDFQUEUE

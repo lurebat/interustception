@@ -1,4 +1,4 @@
-use wdk_sys::{DRIVER_OBJECT, PCUNICODE_STRING, PFN_WDF_DRIVER_DEVICE_ADD, PUNICODE_STRING, WDF_DRIVER_CONFIG, WDF_NO_HANDLE, WDF_NO_OBJECT_ATTRIBUTES, WDFDRIVER};
+use wdk_sys::{DRIVER_OBJECT, PFN_WDF_DRIVER_DEVICE_ADD, WDF_DRIVER_CONFIG, WDF_NO_HANDLE, WDF_NO_OBJECT_ATTRIBUTES, WDFDRIVER};
 use wdk_sys::macros::call_unsafe_wdf_function_binding;
 use crate::{dbg, init_object};
 use crate::framework::error::{Result, NtStatusError, ErrorCode};

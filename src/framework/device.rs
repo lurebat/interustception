@@ -1,10 +1,10 @@
 use core::mem;
-use wdk_sys::{FILE_DEVICE_KEYBOARD, NT_SUCCESS, NTSTATUS, WDF_OBJECT_ATTRIBUTES, WDFDEVICE, WDFDEVICE__, WDFDEVICE_INIT, WDFOBJECT};
+use wdk_sys::{WDF_OBJECT_ATTRIBUTES, WDFDEVICE, WDFDEVICE__, WDFDEVICE_INIT, WDFOBJECT};
 use wdk_sys::_WDF_EXECUTION_LEVEL::WdfExecutionLevelInheritFromParent;
 use wdk_sys::_WDF_SYNCHRONIZATION_SCOPE::WdfSynchronizationScopeInheritFromParent;
 use wdk_sys::macros::call_unsafe_wdf_function_binding;
 use crate::framework::{Context, ErrorCode, NtStatusError, Result};
-use crate::init_object;
+use crate::{dbg, init_object};
 
 #[derive(Debug)]
 pub struct DeviceBuilder<'a> {
@@ -40,7 +40,7 @@ impl<'a> DeviceBuilder<'a> {
             call_unsafe_wdf_function_binding!(
             WdfDeviceInitSetDeviceType,
             self.device_init,
-            FILE_DEVICE_KEYBOARD
+            device_type
             );
         }
 
@@ -90,15 +90,13 @@ impl<'a, T: Context> Device<'a, T> {
 
     pub fn context_mut(&mut self) -> &mut T {
         unsafe {
-            T::get_context(self.device as *mut _ as WDFOBJECT)
+            T::get_context(dbg!(self.device as *mut _ as WDFOBJECT))
                 .as_mut()
         }.expect("Context is null")
     }
 
     pub fn handle(&mut self) -> WDFDEVICE {
-        unsafe {
-            self.device as WDFDEVICE
-        }
+        self.device as WDFDEVICE
     }
 
     pub fn save(self) -> WDFDEVICE {
@@ -112,11 +110,11 @@ impl<'a, T: Context> Device<'a, T> {
 
 impl<'a, T: Context> Drop for Device<'a, T> {
     fn drop(&mut self) {
-        unsafe {
+        dbg!(unsafe {
             call_unsafe_wdf_function_binding!(
                 WdfObjectDelete,
                 self.device as *mut _ as WDFOBJECT
             )
-        }
+        })
     }
 }
