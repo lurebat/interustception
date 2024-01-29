@@ -1,5 +1,5 @@
 use nt_string::unicode_string::{NtUnicodeStr, NtUnicodeString};
-use wdk_sys::{GUID, PWDFDEVICE_INIT, UNICODE_STRING, WDF_DEVICE_PNP_CAPABILITIES, WDF_OBJECT_ATTRIBUTES, WDFDEVICE, WDFDEVICE_INIT};
+use wdk_sys::{GUID, PWDFDEVICE_INIT, UNICODE_STRING, WDF_DEVICE_PNP_CAPABILITIES, WDF_OBJECT_ATTRIBUTES, WDFDEVICE, WDFDEVICE_INIT, WDFOBJECT};
 use wdk_sys::_WDF_EXECUTION_LEVEL::WdfExecutionLevelInheritFromParent;
 use wdk_sys::_WDF_SYNCHRONIZATION_SCOPE::WdfSynchronizationScopeInheritFromParent;
 use wdk_sys::_WDF_TRI_STATE::WdfUseDefault;
@@ -85,7 +85,7 @@ impl PdoBuilder {
         let device = unsafe {
             dbg!(call_unsafe_wdf_function_binding!(
             WdfDeviceCreate,
-            &mut (self.init as *mut WDFDEVICE_INIT) as *mut *mut WDFDEVICE_INIT,
+            &mut self.init as *mut *mut WDFDEVICE_INIT,
             (&mut attrs) as *mut WDF_OBJECT_ATTRIBUTES,
             &mut device_ptr,
         )) }.check_status(ErrorCode::DeviceCreationFailed).map(|_| {
@@ -94,7 +94,7 @@ impl PdoBuilder {
 
         self.init = core::ptr::null_mut();
 
-        Ok(PdoDevice{device})
+        Ok(PdoDevice::new(device))
     }
     fn handle_device_text(&mut self) -> Result<()> {
         if let Some((device_description, device_location, locale)) = &self.device_text {
@@ -192,8 +192,10 @@ impl<'a, T: Context> PdoDevice<'a, T> {
         self.device.handle()
     }
 
-    pub fn save(self) -> WDFDEVICE {
-        self.device.save()
+    pub fn save(mut self) -> WDFDEVICE {
+        let device = self.device.handle();
+        core::mem::forget(self);
+        device
     }
 
     pub fn context(&self) -> &T {
@@ -245,19 +247,23 @@ impl<'a, T: Context> PdoDevice<'a, T> {
     pub fn attach(&mut self, parent: WDFDEVICE) -> Result<()> {
         unsafe {
             call_unsafe_wdf_function_binding!(
-            WdfDeviceCreateDeviceInterface,
-            self.handle(),
-            &GUID::default(),
-            core::ptr::null_mut(),
-        )
-        }.check_status(ErrorCode::DeviceCreateDeviceInterfaceFailed)?;
-
-        unsafe {
-            call_unsafe_wdf_function_binding!(
             WdfFdoAddStaticChild,
             parent,
             self.handle(),
         )
         }.check_status(ErrorCode::FdoAddStaticChildFailed)
+    }
+}
+
+
+impl<'a, T: Context> Drop for PdoDevice<'a, T> {
+    fn drop(&mut self) {
+        dbg!("dropping");
+        dbg!(unsafe {
+            call_unsafe_wdf_function_binding!(
+                WdfObjectDelete,
+                self.handle() as *mut _ as WDFOBJECT
+            )
+        })
     }
 }

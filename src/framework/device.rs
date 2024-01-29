@@ -1,5 +1,5 @@
 use core::mem;
-use wdk_sys::{WDF_OBJECT_ATTRIBUTES, WDFDEVICE, WDFDEVICE__, WDFDEVICE_INIT, WDFOBJECT};
+use wdk_sys::{PDEVICE_OBJECT, WDF_OBJECT_ATTRIBUTES, WDFDEVICE, WDFDEVICE__, WDFDEVICE_INIT, WDFOBJECT};
 use wdk_sys::_WDF_EXECUTION_LEVEL::WdfExecutionLevelInheritFromParent;
 use wdk_sys::_WDF_SYNCHRONIZATION_SCOPE::WdfSynchronizationScopeInheritFromParent;
 use wdk_sys::macros::call_unsafe_wdf_function_binding;
@@ -99,22 +99,21 @@ impl<'a, T: Context> Device<'a, T> {
         self.device as WDFDEVICE
     }
 
-    pub fn save(self) -> WDFDEVICE {
-        let device = self.device as WDFDEVICE;
-
-        mem::forget(self);
-
-        device
-    }
-}
-
-impl<'a, T: Context> Drop for Device<'a, T> {
-    fn drop(&mut self) {
-        dbg!(unsafe {
+    pub fn device_object(&mut self) -> PDEVICE_OBJECT {
+        unsafe {
             call_unsafe_wdf_function_binding!(
-                WdfObjectDelete,
-                self.device as *mut _ as WDFOBJECT
-            )
-        })
+                            WdfDeviceWdmGetDeviceObject,
+                            self.handle()
+                        )
+        }
+    }
+
+    pub fn io_target(&mut self) -> wdk_sys::WDFIOTARGET {
+        unsafe {
+            call_unsafe_wdf_function_binding!(
+                            WdfDeviceGetIoTarget,
+                            self.handle()
+                        )
+        }
     }
 }

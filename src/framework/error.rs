@@ -15,6 +15,11 @@ pub enum ErrorCode {
     PdoInitAddDeviceTextFailed,
     DeviceCreateDeviceInterfaceFailed,
     FdoAddStaticChildFailed,
+    SharingViolation,
+    KeyboardConnectRequestRetrievalFailed,
+    RequestSendFailed,
+    RequestOutputMemoryRetrievalFailed,
+    RequestFormatForInternalIoctlFailed,
 }
 
 #[derive(Snafu, Debug)]
