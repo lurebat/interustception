@@ -7,7 +7,7 @@ use core::sync::atomic::AtomicU32;
 use nt_string::nt_unicode_str;
 use nt_string::unicode_string::{NtUnicodeStr, NtUnicodeString};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use wdk::{nt_success, paged_code, println};
+use wdk::{nt_success, println};
 use wdk_sys::{*};
 use wdk_sys::_WDF_REQUEST_SEND_OPTIONS_FLAGS::WDF_REQUEST_SEND_OPTION_SEND_AND_FORGET;
 use wdk_sys::_WDF_REQUEST_TYPE::WdfRequestTypeDeviceControlInternal;
