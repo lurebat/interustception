@@ -19,7 +19,7 @@ impl<'a> DeviceBuilder<'a> {
         attrs.SynchronizationScope = WdfSynchronizationScopeInheritFromParent;
 
         Self {
-            device_init: device_init,
+            device_init,
             attrs,
         }
     }
@@ -29,7 +29,7 @@ impl<'a> DeviceBuilder<'a> {
             call_unsafe_wdf_function_binding!(
             WdfFdoInitSetFilter,
             self.device_init
-            )
+            );
         }
 
         self
@@ -55,7 +55,7 @@ impl<'a> DeviceBuilder<'a> {
             call_unsafe_wdf_function_binding!(
                 WdfDeviceCreate,
                 &mut (self.device_init as *mut WDFDEVICE_INIT) as *mut *mut WDFDEVICE_INIT,
-                (&mut self.attrs) as *mut WDF_OBJECT_ATTRIBUTES,
+                core::ptr::addr_of_mut!(self.attrs),
                 &mut device,
             )
         }.check_status(ErrorCode::DeviceCreationFailed).map(|_| {

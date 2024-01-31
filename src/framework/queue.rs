@@ -1,7 +1,7 @@
 use core::ptr::null_mut;
 use wdk_sys::_WDF_IO_QUEUE_DISPATCH_TYPE::{WdfIoQueueDispatchParallel, WdfIoQueueDispatchSequential};
 use wdk_sys::_WDF_TRI_STATE::WdfUseDefault;
-use wdk_sys::{BOOLEAN, NTSTATUS, PFN_WDF_IO_QUEUE_IO_DEVICE_CONTROL, PFN_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL, PFN_WDF_REQUEST_COMPLETION_ROUTINE, PVOID, ULONG, WDF_IO_QUEUE_CONFIG, WDF_NO_OBJECT_ATTRIBUTES, WDF_REQUEST_SEND_OPTIONS, WDFDEVICE, WDFIOTARGET, WDFMEMORY, WDFQUEUE, WDFREQUEST, WDFREQUEST__};
+use wdk_sys::{BOOLEAN, NTSTATUS, PFN_WDF_IO_QUEUE_IO_DEVICE_CONTROL, PFN_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL, PFN_WDF_REQUEST_COMPLETION_ROUTINE, PVOID, ULONG, WDF_IO_QUEUE_CONFIG, WDF_NO_HANDLE, WDF_NO_OBJECT_ATTRIBUTES, WDF_REQUEST_SEND_OPTIONS, WDFDEVICE, WDFIOTARGET, WDFMEMORY, WDFQUEUE, WDFREQUEST, WDFREQUEST__};
 use wdk_sys::macros::call_unsafe_wdf_function_binding;
 use crate::foreign::ConnectData;
 use crate::framework::{Result, ErrorCode, NtStatusError, Device, Context};
@@ -13,9 +13,7 @@ pub struct QueueBuilder {
 
 impl QueueBuilder {
     pub fn new() -> Self {
-        let mut config = WDF_IO_QUEUE_CONFIG {
-            ..init_object!(WDF_IO_QUEUE_CONFIG)
-        };
+        let mut config = init_object!(WDF_IO_QUEUE_CONFIG);
         config.PowerManaged = WdfUseDefault;
         config.DispatchType = WdfIoQueueDispatchSequential;
 
@@ -35,7 +33,7 @@ impl QueueBuilder {
     }
 
     pub fn default_queue(&mut self) -> &mut Self {
-        self.config.DefaultQueue = true as BOOLEAN;
+        self.config.DefaultQueue = 1;
         self
     }
 
@@ -77,10 +75,10 @@ impl Queue {
     }
 
     pub fn get_device<T: Context>(&self) -> Device<T> {
-        let device = call_unsafe_wdf_function_binding!(
+        let device = unsafe {call_unsafe_wdf_function_binding!(
         WdfIoQueueGetDevice,
         self.handle()
-    );
+    )};
 
         Device::<T>::new(unsafe { device.as_mut().expect("Device can't be null") })
     }
@@ -183,14 +181,15 @@ impl<'a> KeyboardConnectRequest<'a> {
 
     pub fn connect_data(&mut self) -> Result<ConnectData> {
         let mut connect_data = ConnectData::default();
+        let mut length = 0usize;
         unsafe {
             call_unsafe_wdf_function_binding!(
                         WdfRequestRetrieveInputBuffer,
                         self.handle,
                         core::mem::size_of::<ConnectData>(),
-                        (&mut connect_data) as *mut _ as *mut _,
-                        core::ptr::null_mut(),
-                    )
+                        core::ptr::addr_of_mut!(connect_data).cast(),
+                        &mut length,
+                        )
         }.check_status(ErrorCode::KeyboardConnectRequestRetrievalFailed).map(|_| {
             let x = connect_data;
             x

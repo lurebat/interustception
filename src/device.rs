@@ -38,7 +38,7 @@ pub(crate) fn device_create(device_init: &mut WDFDEVICE_INIT) -> Result<()> {
     let _default_queue = QueueBuilder::new()
         .default_queue()
         .parallel_dispatch()
-        .internal_device_control(Some(internal_ioctl))
+        .internal_device_control(Some(main_device_default_queue_internal_ioctl))
         .create(device.handle())?;
 
     dbg!("device_create - created default queue");
@@ -73,9 +73,9 @@ const DEVICE_LOCATION: NtUnicodeStr<'static> = nt_unicode_str!("Interustception"
 fn create_pdo(device: &mut Device<DeviceContext>, current: u32) -> Result<()> {
     dbg!("create_pdo");
 
-    let instance_id = NtUnicodeString::try_from(format!("{:02}", current)).unwrap();
+    let instance_id = NtUnicodeString::try_from(format!("{current:02}")).unwrap();
 
-    let device_description = NtUnicodeString::try_from(format!("Interustception PDO {:02}", current)).unwrap();
+    let device_description = NtUnicodeString::try_from(format!("Interustception PDO {current:02}")).unwrap();
 
     dbg!("create_pdo - starting to create pdo");
 
@@ -146,11 +146,10 @@ enum KeyboardIoctl {
 
 
 kernel_callback!(
-    fn main_device_default_queue_internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, output_buffer_length: usize, _input_buffer_length: usize, io_control_code: ULONG) -> ()
+    fn main_device_default_queue_internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _output_buffer_length: usize, _input_buffer_length: usize, io_control_code: ULONG) -> ()
     {
-        if let Err(e) = internal_ioctl(queue, request, io_control_code) {
-            dbg!(e);
-        }
+        internal_ioctl(queue, request, io_control_code)
+
     }
 );
 
@@ -226,7 +225,7 @@ fn on_keyboard_connect(request: WDFREQUEST, device: &mut Device<DeviceContext>) 
 
     let mut connect_data = dbg!(request.connect_data())?;
 
-    device.context_mut().upper_connect_data = connect_data.clone();
+    device.context_mut().upper_connect_data = connect_data;
 
     connect_data.class_device_object = dbg!(device.device_object());
     connect_data.class_service = service_callback as PVOID;
@@ -234,9 +233,7 @@ fn on_keyboard_connect(request: WDFREQUEST, device: &mut Device<DeviceContext>) 
     Ok(())
 }
 
-#[link_section = "PAGE"]
 extern "C" fn pdo_from_ioctl(queue: WDFQUEUE, request: WDFREQUEST, output_buffer_length: usize, _input_buffer_length: usize, io_control_code: ULONG) {
-    paged_code!();
     println!("WAWAWA pdo_from_ioctl 1");
 
     let mut status = STATUS_NOT_IMPLEMENTED;
@@ -254,9 +251,7 @@ extern "C" fn pdo_from_ioctl(queue: WDFQUEUE, request: WDFREQUEST, output_buffer
                 )
             };
 
-            if !nt_success(status) {
-                println!("WAWAWA WdfRequestRetrieveOutputMemory failed {status:#010X}");
-            } else {
+            if nt_success(status) {
                 let handle = queue as WDFOBJECT;
                 let device_context: &mut DeviceContext = unsafe { wdf_object_get_device_context(handle).as_mut().unwrap() }; // TODO: Handle this better.
                 status = unsafe {
@@ -269,12 +264,14 @@ extern "C" fn pdo_from_ioctl(queue: WDFQUEUE, request: WDFREQUEST, output_buffer
                     )
                 };
 
-                if !nt_success(status) {
-                    println!("WAWAWA WdfMemoryCopyFromBuffer failed {status:#010X}");
-                } else {
+                if nt_success(status) {
                     status = STATUS_SUCCESS;
                     bytes_transferred = core::mem::size_of::<KeyboardAttributes>() as ULONG_PTR;
+                } else {
+                    println!("WAWAWA WdfMemoryCopyFromBuffer failed {status:#010X}");
                 }
+            } else {
+                println!("WAWAWA WdfRequestRetrieveOutputMemory failed {status:#010X}");
             }
         }
     }
@@ -289,9 +286,7 @@ extern "C" fn pdo_from_ioctl(queue: WDFQUEUE, request: WDFREQUEST, output_buffer
     };
 }
 
-#[link_section = "PAGE"]
 extern "C" fn pdo_to_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _output_buffer_length: usize, _input_buffer_length: usize, io_control_code: ULONG) {
-    paged_code!();
     println!("WAWAWA pdo_to_ioctl 1");
 
     if io_control_code == PdoKeyboardAttributes as u32 {
@@ -384,9 +379,7 @@ unsafe extern "C" fn service_callback(device_object: PDEVICE_OBJECT, input_data_
     }
 }
 
-#[link_section = "PAGE"]
 unsafe extern "C" fn completion_routine(request: WDFREQUEST, _handle: WDFIOTARGET, params: *mut WDF_REQUEST_COMPLETION_PARAMS, context: WDFCONTEXT) {
-    paged_code!();
     println!("WAWAWA completion_routine 1");
 
     let params_ioctl = unsafe { &mut (*params).Parameters.Ioctl };

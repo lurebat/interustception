@@ -24,7 +24,7 @@ pub enum ErrorCode {
 
 #[derive(Snafu, Debug)]
 pub enum Error {
-    #[snafu(display("{:#?}: {nt_status:#010X}"))]
+    #[snafu(display("{:#?}: {nt_status:010X}"))]
     NtStatusError {
         nt_status: NTSTATUS,
         error_code: ErrorCode,

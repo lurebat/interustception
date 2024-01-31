@@ -6,10 +6,10 @@ use crate::framework::*;
 extern crate alloc;
 
 driver_entry!((driver, registry_path) {
-    DriverInit::new(driver)
+    dbg!(DriverInit::new(driver)
         .device_add(Some(device_add))
         .create(registry_path)
-        .to_status()
+        .to_status())
     });
 
 kernel_callback!(
