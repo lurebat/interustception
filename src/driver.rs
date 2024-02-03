@@ -5,7 +5,7 @@ use crate::framework::*;
 
 extern crate alloc;
 
-driver_entry!((driver, registry_path) {
+driver_entry!(fn (driver, registry_path) {
     dbg!(DriverInit::new(driver)
         .device_add(Some(device_add))
         .create(registry_path)

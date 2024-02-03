@@ -38,7 +38,7 @@ pub(crate) fn device_create(device_init: &mut WDFDEVICE_INIT) -> Result<()> {
     let _default_queue = QueueBuilder::new()
         .default_queue()
         .parallel_dispatch()
-        .internal_device_control(Some(main_device_default_queue_internal_ioctl))
+        .internal_device_control(Some(internal_ioctl_cb))
         .create(device.handle())?;
 
     dbg!("device_create - created default queue");
@@ -146,7 +146,7 @@ enum KeyboardIoctl {
 
 
 kernel_callback!(
-    fn main_device_default_queue_internal_ioctl(queue: WDFQUEUE, request: WDFREQUEST, _output_buffer_length: usize, _input_buffer_length: usize, io_control_code: ULONG) -> ()
+    fn internal_ioctl_cb(queue: WDFQUEUE, request: WDFREQUEST, _output_buffer_length: usize, _input_buffer_length: usize, io_control_code: ULONG) -> ()
     {
         internal_ioctl(queue, request, io_control_code)
 

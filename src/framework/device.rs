@@ -1,4 +1,4 @@
-use wdk_sys::{PDEVICE_OBJECT, WDF_OBJECT_ATTRIBUTES, WDFDEVICE, WDFDEVICE__, WDFDEVICE_INIT, WDFOBJECT};
+use wdk_sys::{PDEVICE_OBJECT, PWDFDEVICE_INIT, WDF_NO_HANDLE, WDF_OBJECT_ATTRIBUTES, WDFDEVICE, WDFDEVICE__, WDFDEVICE_INIT, WDFOBJECT};
 use wdk_sys::_WDF_EXECUTION_LEVEL::WdfExecutionLevelInheritFromParent;
 use wdk_sys::_WDF_SYNCHRONIZATION_SCOPE::WdfSynchronizationScopeInheritFromParent;
 use wdk_sys::macros::call_unsafe_wdf_function_binding;
@@ -49,11 +49,11 @@ impl<'a> DeviceBuilder<'a> {
     pub fn build_with_context<T: Context>(&mut self) -> Result<Device<T>> {
         self.attrs.ContextTypeInfo = T::get_context_type_info();
 
-        let mut device = core::ptr::null_mut();
+        let mut device = WDF_NO_HANDLE as _;
         unsafe {
             call_unsafe_wdf_function_binding!(
                 WdfDeviceCreate,
-                &mut (self.device_init as *mut WDFDEVICE_INIT) as *mut *mut WDFDEVICE_INIT,
+                &mut (self.device_init as PWDFDEVICE_INIT),
                 core::ptr::addr_of_mut!(self.attrs),
                 &mut device,
             )

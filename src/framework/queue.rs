@@ -7,6 +7,7 @@ use crate::foreign::ConnectData;
 use crate::framework::{Result, ErrorCode, NtStatusError, Device, Context};
 use crate::init_object;
 
+#[repr(transparent)]
 pub struct QueueBuilder {
     pub config: WDF_IO_QUEUE_CONFIG,
 }

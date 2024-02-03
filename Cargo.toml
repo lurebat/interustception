@@ -16,6 +16,7 @@ num_enum = {version = "0.7.2", default-features = false, features = []}
 snafu = {version = "0.8.0", default-features = false, features = []}
 nt-string = {version = "0.1.1", default-features = false, features = ["alloc"]}
 
+[package.metadata.wdk]
 
 [build-dependencies]
 wdk-build = {git = "https://github.com/microsoft/windows-drivers-rs.git", branch = "main"}

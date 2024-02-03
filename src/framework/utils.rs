@@ -4,6 +4,7 @@ macro_rules! kernel_callback {
     (fn $fn_name:ident( $($params:tt)* ) -> $ret_type:ty {
         $($body:tt)*
     }) => {
+        #[no_mangle]
         #[link_section = "PAGE"]
         pub unsafe extern "C" fn $fn_name( $($params)* ) -> $ret_type {
             wdk::paged_code!();
@@ -13,7 +14,8 @@ macro_rules! kernel_callback {
 }
 
 #[macro_export]
-macro_rules! driver_entry { (($driver:ident, $registry_path:ident) { $($body:tt)* }) => {
+macro_rules! driver_entry { (fn ($driver:ident, $registry_path:ident) { $($body:tt)* }) => {
+        #[no_mangle]
         #[link_section = "INIT"]
         #[export_name = "DriverEntry"] // WDF expects a symbol with the name DriverEntry
         extern "system" fn driver_entry(
